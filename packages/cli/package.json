@@ -1,6 +1,6 @@
 {
-	"name": "seqoia-cli",
-	"version": "0.1.0-alpha.0",
+	"name": "sequoia-cli",
+	"version": "0.0.1",
 	"module": "dist/index.js",
 	"type": "module",
 	"bin": {
