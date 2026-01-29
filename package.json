@@ -6,6 +6,8 @@
 		"docs"
 	],
 	"scripts": {
+	  "dev:cli": "cd packages/cli && bun run dev",
+		"dev:docs": "cd docs && bun run dev",
 		"build:docs": "cd docs && bun run build",
 		"build:cli": "cd packages/cli && bun run build",
 		"deploy:docs": "cd docs && bun run deploy",
