@@ -6,26 +6,37 @@ export function parseFrontmatter(content: string, mapping?: FrontmatterMapping):
   frontmatter: PostFrontmatter;
   body: string;
 } {
-  const frontmatterRegex = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
+  // Support multiple frontmatter delimiters:
+  // --- (YAML) - Jekyll, Astro, most SSGs
+  // +++ (TOML) - Hugo
+  // *** - Alternative format
+  const frontmatterRegex = /^(---|\+\+\+|\*\*\*)\n([\s\S]*?)\n\1\n([\s\S]*)$/;
   const match = content.match(frontmatterRegex);
 
   if (!match) {
     throw new Error("Could not parse frontmatter");
   }
 
-  const frontmatterStr = match[1] ?? "";
-  const body = match[2] ?? "";
+  const delimiter = match[1];
+  const frontmatterStr = match[2] ?? "";
+  const body = match[3] ?? "";
 
-  // Parse YAML-like frontmatter manually
+  // Determine format based on delimiter:
+  // +++ uses TOML (key = value)
+  // --- and *** use YAML (key: value)
+  const isToml = delimiter === "+++";
+  const separator = isToml ? "=" : ":";
+
+  // Parse frontmatter manually
   const raw: Record<string, unknown> = {};
   const lines = frontmatterStr.split("\n");
 
   for (const line of lines) {
-    const colonIndex = line.indexOf(":");
-    if (colonIndex === -1) continue;
+    const sepIndex = line.indexOf(separator);
+    if (sepIndex === -1) continue;
 
-    const key = line.slice(0, colonIndex).trim();
-    let value = line.slice(colonIndex + 1).trim();
+    const key = line.slice(0, sepIndex).trim();
+    let value = line.slice(sepIndex + 1).trim();
 
     // Handle quoted strings
     if (
@@ -155,14 +166,22 @@ export async function scanContentDirectory(
 }
 
 export function updateFrontmatterWithAtUri(rawContent: string, atUri: string): string {
-  // Check if atUri already exists in frontmatter
-  if (rawContent.includes("atUri:")) {
-    // Replace existing atUri
-    return rawContent.replace(/atUri:\s*["']?[^"'\n]+["']?\n?/, `atUri: "${atUri}"\n`);
+  // Detect which delimiter is used (---, +++, or ***)
+  const delimiterMatch = rawContent.match(/^(---|\+\+\+|\*\*\*)/);
+  const delimiter = delimiterMatch?.[1] ?? "---";
+  const isToml = delimiter === "+++";
+
+  // Format the atUri entry based on frontmatter type
+  const atUriEntry = isToml ? `atUri = "${atUri}"` : `atUri: "${atUri}"`;
+
+  // Check if atUri already exists in frontmatter (handle both formats)
+  if (rawContent.includes("atUri:") || rawContent.includes("atUri =")) {
+    // Replace existing atUri (match both YAML and TOML formats)
+    return rawContent.replace(/atUri\s*[=:]\s*["']?[^"'\n]+["']?\n?/, `${atUriEntry}\n`);
   }
 
-  // Insert atUri before the closing ---
-  const frontmatterEndIndex = rawContent.indexOf("---", 4);
+  // Insert atUri before the closing delimiter
+  const frontmatterEndIndex = rawContent.indexOf(delimiter, 4);
   if (frontmatterEndIndex === -1) {
     throw new Error("Could not find frontmatter end");
   }
@@ -170,7 +189,7 @@ export function updateFrontmatterWithAtUri(rawContent: string, atUri: string): s
   const beforeEnd = rawContent.slice(0, frontmatterEndIndex);
   const afterEnd = rawContent.slice(frontmatterEndIndex);
 
-  return `${beforeEnd}atUri: "${atUri}"\n${afterEnd}`;
+  return `${beforeEnd}${atUriEntry}\n${afterEnd}`;
 }
 
 export function stripMarkdownForText(markdown: string): string {
