@@ -1,15 +1,70 @@
-# at-publisher
+# Sequoia
 
-To install dependencies:
+![cover](https://sequoia.pub/og.png)
+
+A CLI for publishing [Standard.site](https://standard.site) documents to the [AT Protocol](https://atproto.com). 
+
+> [!NOTE]
+> [Visit the docs for more info](https://sequoia.pub)
+
+## Quickstart
+
+Install the CLI
 
 ```bash
+pnpm i -g sequoia-cli
+```
+
+Authorize
+
+```bash
+sequoia auth
+```
+
+Initialize in your blog repo
+
+```bash
+sequoia init
+```
+
+Publish your posts
+
+```bash
+sequoia publish
+```
+
+Inject link tags for verification (optional)
+
+```bash
+sequoia inject
+```
+
+[Full documentation](https://sequoia.pub)
+
+## Local Development
+
+Make sure [Bun](https://bun.com) is installed
+
+Clone the git repo and install dependencies
+
+```bash
+git clone git@tangled.org:stevedylan.dev/sequoia
+cd sequoia
 bun install
 ```
 
-To run:
+Move into `packages/cli` and build/test
 
 ```bash
-bun run index.ts
+cd packages/cli
+bun dev
 ```
 
-This project was created using `bun init` in bun v1.3.5. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+## License 
+
+MIT
+
+## Contact
+
+[ATProto](https://pds.ls/at://stevedylan.dev)
+[Email](mailto:contact@stavedylan.dev)
