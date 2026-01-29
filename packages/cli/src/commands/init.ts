@@ -11,6 +11,13 @@ export const initCommand = command({
 	description: "Initialize a new publisher configuration",
 	args: {},
 	handler: async () => {
+		// Handle Ctrl+C to exit immediately instead of cancelling one prompt at a time
+		const exitHandler = () => {
+			consola.info("\nCancelled");
+			process.exit(0);
+		};
+		process.on("SIGINT", exitHandler);
+
 		// Check if config already exists
 		const existingConfig = await findConfig();
 		if (existingConfig) {
