@@ -33,7 +33,7 @@ Publish evergreen content to the ATmosphere
 
 > https://tanlged.org/stevedylan.dev/sequoia
 	`,
-	version: "0.0.5",
+	version: "0.0.6",
 	cmds: {
 		auth: authCommand,
 		init: initCommand,
