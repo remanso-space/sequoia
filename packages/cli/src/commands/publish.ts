@@ -1,5 +1,5 @@
 import { command, flag } from "cmd-ts";
-import { consola } from "consola";
+import { select, spinner, log } from "@clack/prompts";
 import * as path from "path";
 import { loadConfig, loadState, saveState, findConfig } from "../lib/config";
 import { loadCredentials, listCredentials, getCredentials } from "../lib/credentials";
@@ -10,6 +10,7 @@ import {
   updateFrontmatterWithAtUri,
 } from "../lib/markdown";
 import type { BlogPost, BlobObject } from "../lib/types";
+import { exitOnCancel } from "../lib/prompts";
 
 export const publishCommand = command({
   name: "publish",
@@ -30,15 +31,15 @@ export const publishCommand = command({
     // Load config
     const configPath = await findConfig();
     if (!configPath) {
-      consola.error("No publisher.config.ts found. Run 'publisher init' first.");
+      log.error("No publisher.config.ts found. Run 'publisher init' first.");
       process.exit(1);
     }
 
     const config = await loadConfig(configPath);
     const configDir = path.dirname(configPath);
 
-    consola.info(`Site: ${config.siteUrl}`);
-    consola.info(`Content directory: ${config.contentDir}`);
+    log.info(`Site: ${config.siteUrl}`);
+    log.info(`Content directory: ${config.contentDir}`);
 
     // Load credentials
     let credentials = await loadCredentials(config.identity);
@@ -47,25 +48,25 @@ export const publishCommand = command({
     if (!credentials) {
       const identities = await listCredentials();
       if (identities.length === 0) {
-        consola.error("No credentials found. Run 'sequoia auth' first.");
-        consola.info("Or set ATP_IDENTIFIER and ATP_APP_PASSWORD environment variables.");
+        log.error("No credentials found. Run 'sequoia auth' first.");
+        log.info("Or set ATP_IDENTIFIER and ATP_APP_PASSWORD environment variables.");
         process.exit(1);
       }
 
       // Multiple identities exist but none selected - prompt user
-      consola.info("Multiple identities found. Select one to use:");
-      const selected = await consola.prompt("Identity:", {
-        type: "select",
-        options: identities,
-      });
+      log.info("Multiple identities found. Select one to use:");
+      const selected = exitOnCancel(await select({
+        message: "Identity:",
+        options: identities.map(id => ({ value: id, label: id })),
+      }));
 
-      credentials = await getCredentials(selected as string);
+      credentials = await getCredentials(selected);
       if (!credentials) {
-        consola.error("Failed to load selected credentials.");
+        log.error("Failed to load selected credentials.");
         process.exit(1);
       }
 
-      consola.info(`Tip: Add "identity": "${selected}" to sequoia.json to use this by default.`);
+      log.info(`Tip: Add "identity": "${selected}" to sequoia.json to use this by default.`);
     }
 
     // Resolve content directory
@@ -83,9 +84,10 @@ export const publishCommand = command({
     const state = await loadState(configDir);
 
     // Scan for posts
-    consola.start("Scanning for posts...");
+    const s = spinner();
+    s.start("Scanning for posts...");
     const posts = await scanContentDirectory(contentDir, config.frontmatter, config.ignore);
-    consola.info(`Found ${posts.length} posts`);
+    s.stop(`Found ${posts.length} posts`);
 
     // Determine which posts need publishing
     const postsToPublish: Array<{
@@ -123,29 +125,30 @@ export const publishCommand = command({
     }
 
     if (postsToPublish.length === 0) {
-      consola.success("All posts are up to date. Nothing to publish.");
+      log.success("All posts are up to date. Nothing to publish.");
       return;
     }
 
-    consola.info(`\n${postsToPublish.length} posts to publish:\n`);
+    log.info(`\n${postsToPublish.length} posts to publish:\n`);
     for (const { post, action, reason } of postsToPublish) {
       const icon = action === "create" ? "+" : "~";
-      consola.log(`  ${icon} ${post.frontmatter.title} (${reason})`);
+      log.message(`  ${icon} ${post.frontmatter.title} (${reason})`);
     }
 
     if (dryRun) {
-      consola.info("\nDry run complete. No changes made.");
+      log.info("\nDry run complete. No changes made.");
       return;
     }
 
     // Create agent
-    consola.start(`\nConnecting to ${credentials.pdsUrl}...`);
+    s.start(`Connecting to ${credentials.pdsUrl}...`);
     let agent;
     try {
       agent = await createAgent(credentials);
-      consola.success(`Logged in as ${agent.session?.handle}`);
+      s.stop(`Logged in as ${agent.session?.handle}`);
     } catch (error) {
-      consola.error("Failed to login:", error);
+      s.stop("Failed to login");
+      log.error(`Failed to login: ${error}`);
       process.exit(1);
     }
 
@@ -155,7 +158,7 @@ export const publishCommand = command({
     let errorCount = 0;
 
     for (const { post, action } of postsToPublish) {
-      consola.start(`Publishing: ${post.frontmatter.title}`);
+      s.start(`Publishing: ${post.frontmatter.title}`);
 
       try {
         // Handle cover image upload
@@ -168,13 +171,13 @@ export const publishCommand = command({
           );
 
           if (imagePath) {
-            consola.info(`  Uploading cover image: ${path.basename(imagePath)}`);
+            log.info(`  Uploading cover image: ${path.basename(imagePath)}`);
             coverImage = await uploadImage(agent, imagePath);
             if (coverImage) {
-              consola.info(`  Uploaded image blob: ${coverImage.ref.$link}`);
+              log.info(`  Uploaded image blob: ${coverImage.ref.$link}`);
             }
           } else {
-            consola.warn(`  Cover image not found: ${post.frontmatter.ogImage}`);
+            log.warn(`  Cover image not found: ${post.frontmatter.ogImage}`);
           }
         }
 
@@ -184,12 +187,12 @@ export const publishCommand = command({
 
         if (action === "create") {
           atUri = await createDocument(agent, post, config, coverImage);
-          consola.success(`  Created: ${atUri}`);
+          s.stop(`Created: ${atUri}`);
 
           // Update frontmatter with atUri
           const updatedContent = updateFrontmatterWithAtUri(post.rawContent, atUri);
           await Bun.write(post.filePath, updatedContent);
-          consola.info(`  Updated frontmatter in ${path.basename(post.filePath)}`);
+          log.info(`  Updated frontmatter in ${path.basename(post.filePath)}`);
 
           // Use updated content (with atUri) for hash so next run sees matching hash
           contentForHash = updatedContent;
@@ -197,7 +200,7 @@ export const publishCommand = command({
         } else {
           atUri = post.frontmatter.atUri!;
           await updateDocument(agent, post, atUri, config, coverImage);
-          consola.success(`  Updated: ${atUri}`);
+          s.stop(`Updated: ${atUri}`);
 
           // For updates, rawContent already has atUri
           contentForHash = post.rawContent;
@@ -214,7 +217,8 @@ export const publishCommand = command({
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        consola.error(`  Error publishing "${path.basename(post.filePath)}": ${errorMessage}`);
+        s.stop(`Error publishing "${path.basename(post.filePath)}"`);
+        log.error(`  ${errorMessage}`);
         errorCount++;
       }
     }
@@ -223,11 +227,11 @@ export const publishCommand = command({
     await saveState(configDir, state);
 
     // Summary
-    consola.log("\n---");
-    consola.info(`Published: ${publishedCount}`);
-    consola.info(`Updated: ${updatedCount}`);
+    log.message("\n---");
+    log.info(`Published: ${publishedCount}`);
+    log.info(`Updated: ${updatedCount}`);
     if (errorCount > 0) {
-      consola.warn(`Errors: ${errorCount}`);
+      log.warn(`Errors: ${errorCount}`);
     }
   },
 });

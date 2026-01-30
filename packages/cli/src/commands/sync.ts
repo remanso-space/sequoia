@@ -1,10 +1,11 @@
 import { command, flag } from "cmd-ts";
-import { consola } from "consola";
+import { select, spinner, log } from "@clack/prompts";
 import * as path from "path";
 import { loadConfig, loadState, saveState, findConfig } from "../lib/config";
 import { loadCredentials, listCredentials, getCredentials } from "../lib/credentials";
 import { createAgent, listDocuments } from "../lib/atproto";
 import { scanContentDirectory, getContentHash, updateFrontmatterWithAtUri } from "../lib/markdown";
+import { exitOnCancel } from "../lib/prompts";
 
 export const syncCommand = command({
   name: "sync",
@@ -25,15 +26,15 @@ export const syncCommand = command({
     // Load config
     const configPath = await findConfig();
     if (!configPath) {
-      consola.error("No sequoia.json found. Run 'sequoia init' first.");
+      log.error("No sequoia.json found. Run 'sequoia init' first.");
       process.exit(1);
     }
 
     const config = await loadConfig(configPath);
     const configDir = path.dirname(configPath);
 
-    consola.info(`Site: ${config.siteUrl}`);
-    consola.info(`Publication: ${config.publicationUri}`);
+    log.info(`Site: ${config.siteUrl}`);
+    log.info(`Publication: ${config.publicationUri}`);
 
     // Load credentials
     let credentials = await loadCredentials(config.identity);
@@ -41,41 +42,43 @@ export const syncCommand = command({
     if (!credentials) {
       const identities = await listCredentials();
       if (identities.length === 0) {
-        consola.error("No credentials found. Run 'sequoia auth' first.");
+        log.error("No credentials found. Run 'sequoia auth' first.");
         process.exit(1);
       }
 
-      consola.info("Multiple identities found. Select one to use:");
-      const selected = await consola.prompt("Identity:", {
-        type: "select",
-        options: identities,
-      });
+      log.info("Multiple identities found. Select one to use:");
+      const selected = exitOnCancel(await select({
+        message: "Identity:",
+        options: identities.map(id => ({ value: id, label: id })),
+      }));
 
-      credentials = await getCredentials(selected as string);
+      credentials = await getCredentials(selected);
       if (!credentials) {
-        consola.error("Failed to load selected credentials.");
+        log.error("Failed to load selected credentials.");
         process.exit(1);
       }
     }
 
     // Create agent
-    consola.start(`Connecting to ${credentials.pdsUrl}...`);
+    const s = spinner();
+    s.start(`Connecting to ${credentials.pdsUrl}...`);
     let agent;
     try {
       agent = await createAgent(credentials);
-      consola.success(`Logged in as ${agent.session?.handle}`);
+      s.stop(`Logged in as ${agent.session?.handle}`);
     } catch (error) {
-      consola.error("Failed to login:", error);
+      s.stop("Failed to login");
+      log.error(`Failed to login: ${error}`);
       process.exit(1);
     }
 
     // Fetch documents from PDS
-    consola.start("Fetching documents from PDS...");
+    s.start("Fetching documents from PDS...");
     const documents = await listDocuments(agent, config.publicationUri);
-    consola.info(`Found ${documents.length} documents on PDS`);
+    s.stop(`Found ${documents.length} documents on PDS`);
 
     if (documents.length === 0) {
-      consola.info("No documents found for this publication.");
+      log.info("No documents found for this publication.");
       return;
     }
 
@@ -85,9 +88,9 @@ export const syncCommand = command({
       : path.join(configDir, config.contentDir);
 
     // Scan local posts
-    consola.start("Scanning local content...");
+    s.start("Scanning local content...");
     const localPosts = await scanContentDirectory(contentDir, config.frontmatter);
-    consola.info(`Found ${localPosts.length} local posts`);
+    s.stop(`Found ${localPosts.length} local posts`);
 
     // Build a map of path -> local post for matching
     // Document path is like /posts/my-post-slug
@@ -106,7 +109,7 @@ export const syncCommand = command({
     let unmatchedCount = 0;
     let frontmatterUpdates: Array<{ filePath: string; atUri: string }> = [];
 
-    consola.log("\nMatching documents to local files:\n");
+    log.message("\nMatching documents to local files:\n");
 
     for (const doc of documents) {
       const docPath = doc.value.path;
@@ -114,10 +117,10 @@ export const syncCommand = command({
 
       if (localPost) {
         matchedCount++;
-        consola.log(`  ✓ ${doc.value.title}`);
-        consola.log(`    Path: ${docPath}`);
-        consola.log(`    URI: ${doc.uri}`);
-        consola.log(`    File: ${path.basename(localPost.filePath)}`);
+        log.message(`  ✓ ${doc.value.title}`);
+        log.message(`    Path: ${docPath}`);
+        log.message(`    URI: ${doc.uri}`);
+        log.message(`    File: ${path.basename(localPost.filePath)}`);
 
         // Update state (use relative path from config directory)
         const contentHash = await getContentHash(localPost.rawContent);
@@ -134,47 +137,47 @@ export const syncCommand = command({
             filePath: localPost.filePath,
             atUri: doc.uri,
           });
-          consola.log(`    → Will update frontmatter`);
+          log.message(`    → Will update frontmatter`);
         }
       } else {
         unmatchedCount++;
-        consola.log(`  ✗ ${doc.value.title} (no matching local file)`);
-        consola.log(`    Path: ${docPath}`);
-        consola.log(`    URI: ${doc.uri}`);
+        log.message(`  ✗ ${doc.value.title} (no matching local file)`);
+        log.message(`    Path: ${docPath}`);
+        log.message(`    URI: ${doc.uri}`);
       }
-      consola.log("");
+      log.message("");
     }
 
     // Summary
-    consola.log("---");
-    consola.info(`Matched: ${matchedCount} documents`);
+    log.message("---");
+    log.info(`Matched: ${matchedCount} documents`);
     if (unmatchedCount > 0) {
-      consola.warn(`Unmatched: ${unmatchedCount} documents (exist on PDS but not locally)`);
+      log.warn(`Unmatched: ${unmatchedCount} documents (exist on PDS but not locally)`);
     }
 
     if (dryRun) {
-      consola.info("\nDry run complete. No changes made.");
+      log.info("\nDry run complete. No changes made.");
       return;
     }
 
     // Save updated state
     await saveState(configDir, state);
     const newPostCount = Object.keys(state.posts).length;
-    consola.success(`\nSaved .sequoia-state.json (${originalPostCount} → ${newPostCount} entries)`);
+    log.success(`\nSaved .sequoia-state.json (${originalPostCount} → ${newPostCount} entries)`);
 
     // Update frontmatter if requested
     if (frontmatterUpdates.length > 0) {
-      consola.start(`Updating frontmatter in ${frontmatterUpdates.length} files...`);
+      s.start(`Updating frontmatter in ${frontmatterUpdates.length} files...`);
       for (const { filePath, atUri } of frontmatterUpdates) {
         const file = Bun.file(filePath);
         const content = await file.text();
         const updated = updateFrontmatterWithAtUri(content, atUri);
         await Bun.write(filePath, updated);
-        consola.log(`  Updated: ${path.basename(filePath)}`);
+        log.message(`  Updated: ${path.basename(filePath)}`);
       }
-      consola.success("Frontmatter updated");
+      s.stop("Frontmatter updated");
     }
 
-    consola.success("\nSync complete!");
+    log.success("\nSync complete!");
   },
 });

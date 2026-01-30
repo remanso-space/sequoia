@@ -1,5 +1,5 @@
 import { command, flag, option, optional, string } from "cmd-ts";
-import { consola } from "consola";
+import { log } from "@clack/prompts";
 import * as path from "path";
 import { Glob } from "bun";
 import { loadConfig, loadState, findConfig } from "../lib/config";
@@ -25,7 +25,7 @@ export const injectCommand = command({
 		// Load config
 		const configPath = await findConfig();
 		if (!configPath) {
-			consola.error("No sequoia.json found. Run 'sequoia init' first.");
+			log.error("No sequoia.json found. Run 'sequoia init' first.");
 			process.exit(1);
 		}
 
@@ -38,7 +38,7 @@ export const injectCommand = command({
 			? outputDir
 			: path.join(configDir, outputDir);
 
-		consola.info(`Scanning for HTML files in: ${resolvedOutputDir}`);
+		log.info(`Scanning for HTML files in: ${resolvedOutputDir}`);
 
 		// Load state to get atUri mappings
 		const state = await loadState(configDir);
@@ -88,13 +88,13 @@ export const injectCommand = command({
 		}
 
 		if (pathToAtUri.size === 0) {
-			consola.warn(
+			log.warn(
 				"No published posts found in state. Run 'sequoia publish' first.",
 			);
 			return;
 		}
 
-		consola.info(`Found ${pathToAtUri.size} published posts in state`);
+		log.info(`Found ${pathToAtUri.size} published posts in state`);
 
 		// Scan for HTML files
 		const glob = new Glob("**/*.html");
@@ -105,11 +105,11 @@ export const injectCommand = command({
 		}
 
 		if (htmlFiles.length === 0) {
-			consola.warn(`No HTML files found in ${resolvedOutputDir}`);
+			log.warn(`No HTML files found in ${resolvedOutputDir}`);
 			return;
 		}
 
-		consola.info(`Found ${htmlFiles.length} HTML files`);
+		log.info(`Found ${htmlFiles.length} HTML files`);
 
 		let injectedCount = 0;
 		let skippedCount = 0;
@@ -165,14 +165,14 @@ export const injectCommand = command({
 			// Find </head> and inject before it
 			const headCloseIndex = content.indexOf("</head>");
 			if (headCloseIndex === -1) {
-				consola.warn(`  No </head> found in ${relativePath}, skipping`);
+				log.warn(`  No </head> found in ${relativePath}, skipping`);
 				skippedCount++;
 				continue;
 			}
 
 			if (dryRun) {
-				consola.log(`  Would inject into: ${relativePath}`);
-				consola.log(`    ${linkTag}`);
+				log.message(`  Would inject into: ${relativePath}`);
+				log.message(`    ${linkTag}`);
 				injectedCount++;
 				continue;
 			}
@@ -185,21 +185,21 @@ export const injectCommand = command({
 				content.slice(headCloseIndex);
 
 			await Bun.write(htmlPath, content);
-			consola.success(`  Injected into: ${relativePath}`);
+			log.success(`  Injected into: ${relativePath}`);
 			injectedCount++;
 		}
 
 		// Summary
-		consola.log("\n---");
+		log.message("\n---");
 		if (dryRun) {
-			consola.info("Dry run complete. No changes made.");
+			log.info("Dry run complete. No changes made.");
 		}
-		consola.info(`Injected: ${injectedCount}`);
-		consola.info(`Already has tag: ${alreadyHasCount}`);
-		consola.info(`Skipped (no match): ${skippedCount}`);
+		log.info(`Injected: ${injectedCount}`);
+		log.info(`Already has tag: ${alreadyHasCount}`);
+		log.info(`Skipped (no match): ${skippedCount}`);
 
 		if (skippedCount > 0 && !dryRun) {
-			consola.info(
+			log.info(
 				"\nTip: Skipped files had no matching published post. This is normal for non-post pages.",
 			);
 		}

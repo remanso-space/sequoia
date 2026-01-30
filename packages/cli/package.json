@@ -28,6 +28,6 @@
 	"dependencies": {
 		"@atproto/api": "^0.18.17",
 		"cmd-ts": "^0.14.3",
-		"consola": "^3.4.2"
+		"@clack/prompts": "^1.0.0"
 	}
 }

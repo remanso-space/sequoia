@@ -1,152 +1,156 @@
 import { command } from "cmd-ts";
-import { consola } from "consola";
+import {
+	intro,
+	outro,
+	note,
+	text,
+	confirm,
+	select,
+	spinner,
+	log,
+} from "@clack/prompts";
 import * as path from "path";
 import { findConfig, generateConfigTemplate } from "../lib/config";
 import { loadCredentials } from "../lib/credentials";
 import { createAgent, createPublication } from "../lib/atproto";
 import type { FrontmatterMapping } from "../lib/types";
+import { exitOnCancel } from "../lib/prompts";
 
 export const initCommand = command({
 	name: "init",
 	description: "Initialize a new publisher configuration",
 	args: {},
 	handler: async () => {
-		// Handle Ctrl+C to exit immediately instead of cancelling one prompt at a time
-		const exitHandler = () => {
-			consola.info("\nCancelled");
-			process.exit(0);
-		};
-		process.on("SIGINT", exitHandler);
+		intro("Sequoia Configuration Setup");
 
 		// Check if config already exists
 		const existingConfig = await findConfig();
 		if (existingConfig) {
-			const overwrite = await consola.prompt(
-				`Config already exists at ${existingConfig}. Overwrite?`,
-				{
-					type: "confirm",
-					initial: false,
-				},
+			const overwrite = exitOnCancel(
+				await confirm({
+					message: `Config already exists at ${existingConfig}. Overwrite?`,
+					initialValue: false,
+				}),
 			);
 			if (!overwrite) {
-				consola.info("Keeping existing configuration");
+				log.info("Keeping existing configuration");
 				return;
 			}
 		}
 
-		consola.box(
-			"Sequoia Configuration Setup\n\n" +
-				"Follow the prompts to build your config for publishing",
-		);
+		note("Follow the prompts to build your config for publishing", "Setup");
 
-		const siteUrl = await consola.prompt(
-			"Site URL (canonical URL of your site):",
-			{
-				type: "text",
+		const siteUrl = exitOnCancel(
+			await text({
+				message: "Site URL (canonical URL of your site):",
 				placeholder: "https://example.com",
-			},
+			}),
 		);
 
 		if (!siteUrl) {
-			consola.error("Site URL is required");
+			log.error("Site URL is required");
 			process.exit(1);
 		}
 
-		const contentDir = await consola.prompt(
-			"Content directory (relative path):",
-			{
-				type: "text",
-				default: "./content",
-				placeholder: "./content",
-			},
+		const contentDir = exitOnCancel(
+			await text({
+				message: "Content directory:",
+				placeholder: "./src/content/blog",
+			}),
 		);
 
-		const imagesDir = await consola.prompt(
-			"Cover images directory (where cover/og images are stored, leave empty to skip):",
-			{
-				type: "text",
-				placeholder: "./public/images",
-			},
+		const imagesDir = exitOnCancel(
+			await text({
+				message: "Cover images directory (leave empty to skip):",
+				placeholder: "./src/assets",
+			}),
 		);
 
 		// Public/static directory for .well-known files
-		const publicDir = await consola.prompt(
-			"Public/static directory (for .well-known files):",
-			{
-				type: "text",
-				default: "./public",
-				placeholder: "./public (Astro, Next.js) or ./static (Hugo)",
-			},
+		const publicDir = exitOnCancel(
+			await text({
+				message: "Public/static directory (for .well-known files):",
+				placeholder: "./public",
+			}),
 		);
 
 		// Output directory for inject command
-		const outputDir = await consola.prompt(
-			"Build output directory (for link tag injection):",
-			{
-				type: "text",
-				default: "./dist",
-				placeholder: "./dist (Astro) or ./public (Hugo) or ./out (Next.js)",
-			},
+		const outputDir = exitOnCancel(
+			await text({
+				message: "Build output directory (for link tag injection):",
+				placeholder: "./dist",
+			}),
 		);
 
 		// Path prefix for posts
-		const pathPrefix = await consola.prompt("URL path prefix for posts:", {
-			type: "text",
-			default: "/posts",
-			placeholder: "/posts, /blog, /articles, etc.",
-		});
+		const pathPrefix = exitOnCancel(
+			await text({
+				message: "URL path prefix for posts:",
+				placeholder: "/posts, /blog, /articles, etc.",
+			}),
+		);
 
 		// Frontmatter mapping configuration
-		consola.info(
+		log.info(
 			"Configure your frontmatter field mappings (press Enter to use defaults):",
 		);
 
-		const titleField = await consola.prompt("Field name for title:", {
-			type: "text",
-			default: "title",
-			placeholder: "title",
-		});
+		const titleField = exitOnCancel(
+			await text({
+				message: "Field name for title:",
+				defaultValue: "title",
+				placeholder: "title",
+			}),
+		);
 
-		const descField = await consola.prompt("Field name for description:", {
-			type: "text",
-			default: "description",
-			placeholder: "description",
-		});
+		const descField = exitOnCancel(
+			await text({
+				message: "Field name for description:",
+				defaultValue: "description",
+				placeholder: "description",
+			}),
+		);
 
-		const dateField = await consola.prompt("Field name for publish date:", {
-			type: "text",
-			default: "publishDate",
-			placeholder: "publishDate, pubDate, date, etc.",
-		});
+		const dateField = exitOnCancel(
+			await text({
+				message: "Field name for publish date:",
+				defaultValue: "publishDate",
+				placeholder: "publishDate, pubDate, date, etc.",
+			}),
+		);
 
-		const coverField = await consola.prompt("Field name for cover image:", {
-			type: "text",
-			default: "ogImage",
-			placeholder: "ogImage, coverImage, image, hero, etc.",
-		});
+		const coverField = exitOnCancel(
+			await text({
+				message: "Field name for cover image:",
+				defaultValue: "ogImage",
+				placeholder: "ogImage, coverImage, image, hero, etc.",
+			}),
+		);
 
-		const tagsField = await consola.prompt("Field name for tags:", {
-			type: "text",
-			default: "tags",
-			placeholder: "tags, categories, keywords, etc.",
-		});
+		const tagsField = exitOnCancel(
+			await text({
+				message: "Field name for tags:",
+				defaultValue: "tags",
+				placeholder: "tags, categories, keywords, etc.",
+			}),
+		);
 
 		let frontmatterMapping: FrontmatterMapping | undefined = {};
 
 		if (titleField && titleField !== "title") {
-			frontmatterMapping.title = titleField as string;
+			frontmatterMapping.title = titleField;
 		}
 		if (descField && descField !== "description") {
-			frontmatterMapping.description = descField as string;
+			frontmatterMapping.description = descField;
 		}
 		if (dateField && dateField !== "publishDate") {
-			frontmatterMapping.publishDate = dateField as string;
+			frontmatterMapping.publishDate = dateField;
 		}
 		if (coverField && coverField !== "ogImage") {
-			frontmatterMapping.coverImage = coverField as string;
+			frontmatterMapping.coverImage = coverField;
 		}
 		if (tagsField && tagsField !== "tags") {
-			frontmatterMapping.tags = tagsField as string;
+			frontmatterMapping.tags = tagsField;
 		}
 
 		// Only keep frontmatterMapping if it has any custom fields
@@ -155,13 +159,15 @@ export const initCommand = command({
 		}
 
 		// Publication setup
-		const publicationChoice = await consola.prompt("Publication setup:", {
-			type: "select",
-			options: [
-				{ label: "Create a new publication", value: "create" },
-				{ label: "Use an existing publication AT URI", value: "existing" },
-			],
-		});
+		const publicationChoice = exitOnCancel(
+			await select({
+				message: "Publication setup:",
+				options: [
+					{ label: "Create a new publication", value: "create" },
+					{ label: "Use an existing publication AT URI", value: "existing" },
+				],
+			}),
+		);
 
 		let publicationUri: string;
 		let credentials = await loadCredentials();
@@ -169,80 +175,86 @@ export const initCommand = command({
 		if (publicationChoice === "create") {
 			// Need credentials to create a publication
 			if (!credentials) {
-				consola.error(
+				log.error(
 					"You must authenticate first. Run 'sequoia auth' before creating a publication.",
 				);
 				process.exit(1);
 			}
 
-			consola.start("Connecting to ATProto...");
+			const s = spinner();
+			s.start("Connecting to ATProto...");
 			let agent;
 			try {
 				agent = await createAgent(credentials);
-				consola.success("Connected!");
+				s.stop("Connected!");
 			} catch (error) {
-				consola.error(
+				s.stop("Failed to connect");
+				log.error(
 					"Failed to connect. Check your credentials with 'sequoia auth'.",
 				);
 				process.exit(1);
 			}
 
-			const pubName = await consola.prompt("Publication name:", {
-				type: "text",
-				placeholder: "My Blog",
-			});
+			const pubName = exitOnCancel(
+				await text({
+					message: "Publication name:",
+					placeholder: "My Blog",
+				}),
+			);
 
 			if (!pubName) {
-				consola.error("Publication name is required");
+				log.error("Publication name is required");
 				process.exit(1);
 			}
 
-			const pubDescription = await consola.prompt(
-				"Publication description (optional):",
-				{
-					type: "text",
+			const pubDescription = exitOnCancel(
+				await text({
+					message: "Publication description (optional):",
 					placeholder: "A blog about...",
-				},
+				}),
 			);
 
-			const iconPath = await consola.prompt(
-				"Icon image path (leave empty to skip):",
-				{
-					type: "text",
-					placeholder: "./icon.png",
-				},
+			const iconPath = exitOnCancel(
+				await pathPrompt({
+					message: "Icon image path (leave empty to skip):",
+				}),
 			);
 
-			const showInDiscover = await consola.prompt("Show in Discover feed?", {
-				type: "confirm",
-				initial: true,
-			});
+			const showInDiscover = exitOnCancel(
+				await confirm({
+					message: "Show in Discover feed?",
+					initialValue: true,
+				}),
+			);
 
-			consola.start("Creating publication...");
+			s.start("Creating publication...");
 			try {
 				publicationUri = await createPublication(agent, {
-					url: siteUrl as string,
-					name: pubName as string,
-					description: (pubDescription as string) || undefined,
-					iconPath: (iconPath as string) || undefined,
+					url: siteUrl,
+					name: pubName,
+					description: pubDescription || undefined,
+					iconPath: iconPath || undefined,
 					showInDiscover,
 				});
-				consola.success(`Publication created: ${publicationUri}`);
+				s.stop(`Publication created: ${publicationUri}`);
 			} catch (error) {
-				consola.error("Failed to create publication:", error);
+				s.stop("Failed to create publication");
+				log.error(`Failed to create publication: ${error}`);
 				process.exit(1);
 			}
 		} else {
-			const uri = await consola.prompt("Publication AT URI:", {
-				type: "text",
-				placeholder: "at://did:plc:.../site.standard.publication/...",
-			});
+			const uri = exitOnCancel(
+				await text({
+					message: "Publication AT URI:",
+					placeholder: "at://did:plc:.../site.standard.publication/...",
+				}),
+			);
 
 			if (!uri) {
-				consola.error("Publication URI is required");
+				log.error("Publication URI is required");
 				process.exit(1);
 			}
-			publicationUri = uri as string;
+			publicationUri = uri;
 		}
 
 		// Get PDS URL from credentials (already loaded earlier)
@@ -250,12 +262,12 @@ export const initCommand = command({
 
 		// Generate config file
 		const configContent = generateConfigTemplate({
-			siteUrl: siteUrl as string,
-			contentDir: contentDir as string,
+			siteUrl: siteUrl,
+			contentDir: contentDir || "./content",
 			imagesDir: imagesDir || undefined,
-			publicDir: publicDir as string,
-			outputDir: outputDir as string,
-			pathPrefix: pathPrefix as string,
+			publicDir: publicDir || "./public",
+			outputDir: outputDir || "./dist",
+			pathPrefix: pathPrefix || "/posts",
 			publicationUri,
 			pdsUrl,
 			frontmatter: frontmatterMapping,
@@ -264,12 +276,12 @@ export const initCommand = command({
 		const configPath = path.join(process.cwd(), "sequoia.json");
 		await Bun.write(configPath, configContent);
 
-		consola.success(`Configuration saved to ${configPath}`);
+		log.success(`Configuration saved to ${configPath}`);
 
 		// Create .well-known/site.standard.publication file
-		const resolvedPublicDir = path.isAbsolute(publicDir as string)
-			? (publicDir as string)
-			: path.join(process.cwd(), publicDir as string);
+		const resolvedPublicDir = path.isAbsolute(publicDir || "./public")
+			? publicDir || "./public"
+			: path.join(process.cwd(), publicDir || "./public");
 		const wellKnownDir = path.join(resolvedPublicDir, ".well-known");
 		const wellKnownPath = path.join(wellKnownDir, "site.standard.publication");
 
@@ -277,7 +289,7 @@ export const initCommand = command({
 		await Bun.write(path.join(wellKnownDir, ".gitkeep"), "");
 		await Bun.write(wellKnownPath, publicationUri);
 
-		consola.success(`Created ${wellKnownPath}`);
+		log.success(`Created ${wellKnownPath}`);
 
 		// Update .gitignore
 		const gitignorePath = path.join(process.cwd(), ".gitignore");
@@ -291,18 +303,20 @@ export const initCommand = command({
 					gitignorePath,
 					gitignoreContent + `\n${stateFilename}\n`,
 				);
-				consola.info(`Added ${stateFilename} to .gitignore`);
+				log.info(`Added ${stateFilename} to .gitignore`);
 			}
 		} else {
 			await Bun.write(gitignorePath, `${stateFilename}\n`);
-			consola.info(`Created .gitignore with ${stateFilename}`);
+			log.info(`Created .gitignore with ${stateFilename}`);
 		}
 
-		consola.box(
-			"Setup complete!\n\n" +
-				"Next steps:\n" +
+		note(
+			"Next steps:\n" +
 				"1. Run 'sequoia publish --dry-run' to preview\n" +
 				"2. Run 'sequoia publish' to publish your content",
+			"Setup complete!",
 		);
+
+		outro("Happy publishing!");
 	},
 });

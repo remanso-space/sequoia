@@ -1,5 +1,5 @@
 import { command, flag, option, optional, string } from "cmd-ts";
-import { consola } from "consola";
+import { note, text, password, confirm, select, spinner, log } from "@clack/prompts";
 import { AtpAgent } from "@atproto/api";
 import {
   saveCredentials,
@@ -9,6 +9,7 @@ import {
   getCredentialsPath,
 } from "../lib/credentials";
 import { resolveHandleToPDS } from "../lib/atproto";
+import { exitOnCancel } from "../lib/prompts";
 
 export const authCommand = command({
   name: "auth",
@@ -29,9 +30,9 @@ export const authCommand = command({
     if (list) {
       const identities = await listCredentials();
       if (identities.length === 0) {
-        consola.info("No stored identities");
+        log.info("No stored identities");
       } else {
-        consola.info("Stored identities:");
+        log.info("Stored identities:");
         for (const id of identities) {
           console.log(`  - ${id}`);
         }
@@ -48,107 +49,107 @@ export const authCommand = command({
         // No identifier provided - show available and prompt
         const identities = await listCredentials();
         if (identities.length === 0) {
-          consola.info("No saved credentials found");
+          log.info("No saved credentials found");
           return;
         }
         if (identities.length === 1) {
           const deleted = await deleteCredentials(identities[0]);
           if (deleted) {
-            consola.success(`Removed credentials for ${identities[0]}`);
+            log.success(`Removed credentials for ${identities[0]}`);
           }
           return;
         }
         // Multiple identities - prompt
-        const selected = await consola.prompt("Select identity to remove:", {
-          type: "select",
-          options: identities,
-        });
-        const deleted = await deleteCredentials(selected as string);
+        const selected = exitOnCancel(await select({
+          message: "Select identity to remove:",
+          options: identities.map(id => ({ value: id, label: id })),
+        }));
+        const deleted = await deleteCredentials(selected);
         if (deleted) {
-          consola.success(`Removed credentials for ${selected}`);
+          log.success(`Removed credentials for ${selected}`);
         }
         return;
       }
 
       const deleted = await deleteCredentials(identifier);
       if (deleted) {
-        consola.success(`Removed credentials for ${identifier}`);
+        log.success(`Removed credentials for ${identifier}`);
       } else {
-        consola.info(`No credentials found for ${identifier}`);
+        log.info(`No credentials found for ${identifier}`);
       }
       return;
     }
 
-    consola.box(
+    note(
       "To authenticate, you'll need an App Password.\n\n" +
         "Create one at: https://bsky.app/settings/app-passwords\n\n" +
-        "App Passwords are safer than your main password and can be revoked."
+        "App Passwords are safer than your main password and can be revoked.",
+      "Authentication"
     );
 
-    const identifier = await consola.prompt("Handle or DID:", {
-      type: "text",
+    const identifier = exitOnCancel(await text({
+      message: "Handle or DID:",
       placeholder: "yourhandle.bsky.social",
-    });
+    }));
 
-    const password = await consola.prompt("App Password:", {
-      type: "text",
-      placeholder: "xxxx-xxxx-xxxx-xxxx",
-    });
+    const appPassword = exitOnCancel(await password({
+      message: "App Password:",
+    }));
 
-    if (!identifier || !password) {
-      consola.error("Handle and password are required");
+    if (!identifier || !appPassword) {
+      log.error("Handle and password are required");
       process.exit(1);
     }
 
     // Check if this identity already exists
-    const existing = await getCredentials(identifier as string);
+    const existing = await getCredentials(identifier);
     if (existing) {
-      const overwrite = await consola.prompt(
-        `Credentials for ${identifier} already exist. Update?`,
-        {
-          type: "confirm",
-          initial: false,
-        }
-      );
+      const overwrite = exitOnCancel(await confirm({
+        message: `Credentials for ${identifier} already exist. Update?`,
+        initialValue: false,
+      }));
       if (!overwrite) {
-        consola.info("Keeping existing credentials");
+        log.info("Keeping existing credentials");
         return;
       }
     }
 
     // Resolve PDS from handle
-    consola.start("Resolving PDS...");
+    const s = spinner();
+    s.start("Resolving PDS...");
     let pdsUrl: string;
     try {
-      pdsUrl = await resolveHandleToPDS(identifier as string);
-      consola.success(`Found PDS: ${pdsUrl}`);
+      pdsUrl = await resolveHandleToPDS(identifier);
+      s.stop(`Found PDS: ${pdsUrl}`);
     } catch (error) {
-      consola.error("Failed to resolve PDS from handle:", error);
+      s.stop("Failed to resolve PDS");
+      log.error(`Failed to resolve PDS from handle: ${error}`);
       process.exit(1);
     }
 
     // Verify credentials
-    consola.start("Verifying credentials...");
+    s.start("Verifying credentials...");
 
     try {
       const agent = new AtpAgent({ service: pdsUrl });
       await agent.login({
-        identifier: identifier as string,
-        password: password as string,
+        identifier: identifier,
+        password: appPassword,
       });
 
-      consola.success(`Logged in as ${agent.session?.handle}`);
+      s.stop(`Logged in as ${agent.session?.handle}`);
 
       // Save credentials
       await saveCredentials({
         pdsUrl,
-        identifier: identifier as string,
-        password: password as string,
+        identifier: identifier,
+        password: appPassword,
       });
 
-      consola.success(`Credentials saved to ${getCredentialsPath()}`);
+      log.success(`Credentials saved to ${getCredentialsPath()}`);
     } catch (error) {
-      consola.error("Failed to login:", error);
+      s.stop("Failed to login");
+      log.error(`Failed to login: ${error}`);
       process.exit(1);
     }
   },
