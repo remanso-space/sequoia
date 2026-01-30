@@ -1,5 +1,141 @@
-# Workflows 
+# Workflows
 
-:::warning
-Under construction
+Sequoia is designed to fit seamlessly into your existing publishing workflow, whether you're running commands locally or automating deploys with CI/CD pipelines.
+
+## The Publishing Flow
+
+The typical Sequoia workflow follows these steps:
+
+::::steps
+
+### Publish
+
+First, publish your markdown content to the AT Protocol. This creates or updates `site.standard.document` records on your PDS.
+
+```bash [Terminal]
+sequoia publish
+```
+
+This command:
+- Scans your content directory for markdown files
+- Detects changes using content hashing
+- Creates new records for new posts
+- Updates existing records for modified posts
+- Saves state to `.sequoia-state.json`
+
+### Build
+
+Build your site using your static site generator (SSG) as you normally would.
+
+```bash [Terminal]
+# Examples for different frameworks
+npm run build        # Most frameworks
+astro build          # Astro
+hugo                 # Hugo
+next build           # Next.js
+```
+
+### Inject (Optional)
+
+After building, inject the AT URI link tags into your HTML files for document verification.
+
+```bash [Terminal]
+sequoia inject
+```
+
+This adds `<link rel="site.standard.document">` tags to the `<head>` of your built HTML files, enabling aggregators to verify your content.
+
+:::tip
+If you prefer manual control, you can skip this step and configure your SSG to read the `atUri` field from frontmatter instead.
 :::
+
+### Deploy
+
+Deploy your built site to your hosting provider as usual.
+
+```bash [Terminal]
+# Examples
+netlify deploy --prod
+vercel --prod
+rsync -avz ./dist/ user@server:/var/www/
+```
+
+::::
+
+## Environment Variables
+
+Sequoia supports environment variables for automation scenarios like CD/CI.
+
+| Variable | Description |
+|----------|-------------|
+| `ATP_IDENTIFIER` | Your ATProto handle or DID (e.g., `alice.bsky.social`) |
+| `ATP_APP_PASSWORD` | Your ATProto app password |
+| `PDS_URL` | Custom PDS URL (optional, auto-resolved from DID if not set) |
+| `SEQUOIA_PROFILE` | Name of a stored identity profile to use |
+
+## CI/CD Integration
+
+Sequoia works with any CI/CD platform. Set `ATP_IDENTIFIER` and `ATP_APP_PASSWORD` as secrets in your pipeline.
+
+### GitHub Actions
+
+```yaml [.github/workflows/deploy.yml]
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Install Sequoia
+        run: bun install -g sequoia-cli
+
+      - name: Publish to ATProto
+        env:
+          ATP_IDENTIFIER: ${{ secrets.ATP_IDENTIFIER }}
+          ATP_APP_PASSWORD: ${{ secrets.ATP_APP_PASSWORD }}
+        run: sequoia publish
+
+      - name: Build site
+        run: bun run build
+
+      - name: Inject link tags
+        run: sequoia inject
+
+      - name: Deploy
+        # Add your deployment step here
+        run: echo "Deploy your ./dist folder"
+```
+
+### GitLab CI
+
+```yaml [.gitlab-ci.yml]
+stages:
+  - deploy
+
+deploy:
+  stage: deploy
+  image: oven/bun:latest
+  script:
+    - bun install
+    - bun install -g sequoia-cli
+    - sequoia publish
+    - bun run build
+    - sequoia inject
+    # Add your deployment command
+  only:
+    - main
+  variables:
+    ATP_IDENTIFIER: $ATP_IDENTIFIER
+    ATP_APP_PASSWORD: $ATP_APP_PASSWORD
+```
