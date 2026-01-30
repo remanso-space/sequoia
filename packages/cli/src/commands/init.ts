@@ -133,28 +133,27 @@ export const initCommand = command({
 		);
 
 		// Build frontmatter mapping object
-		let frontmatterMapping: FrontmatterMapping | undefined = {};
+		const fieldMappings: Array<[keyof FrontmatterMapping, string, string]> = [
+			["title", frontmatterConfig.titleField, "title"],
+			["description", frontmatterConfig.descField, "description"],
+			["publishDate", frontmatterConfig.dateField, "publishDate"],
+			["coverImage", frontmatterConfig.coverField, "ogImage"],
+			["tags", frontmatterConfig.tagsField, "tags"],
+		];
 
-		if (frontmatterConfig.titleField !== "title") {
-			frontmatterMapping.title = frontmatterConfig.titleField;
-		}
-		if (frontmatterConfig.descField !== "description") {
-			frontmatterMapping.description = frontmatterConfig.descField;
-		}
-		if (frontmatterConfig.dateField !== "publishDate") {
-			frontmatterMapping.publishDate = frontmatterConfig.dateField;
-		}
-		if (frontmatterConfig.coverField !== "ogImage") {
-			frontmatterMapping.coverImage = frontmatterConfig.coverField;
-		}
-		if (frontmatterConfig.tagsField !== "tags") {
-			frontmatterMapping.tags = frontmatterConfig.tagsField;
-		}
+		const builtMapping = fieldMappings.reduce<FrontmatterMapping>(
+			(acc, [key, value, defaultValue]) => {
+				if (value !== defaultValue) {
+					acc[key] = value;
+				}
+				return acc;
+			},
+			{},
+		);
 
 		// Only keep frontmatterMapping if it has any custom fields
-		if (Object.keys(frontmatterMapping).length === 0) {
-			frontmatterMapping = undefined;
-		}
+		const frontmatterMapping =
+			Object.keys(builtMapping).length > 0 ? builtMapping : undefined;
 
 		// Publication setup
 		const publicationChoice = await select({
