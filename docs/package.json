@@ -6,7 +6,7 @@
 	"scripts": {
 		"dev": "vocs dev",
 		"build": "vocs build && bun inject-og-tags.ts",
-		"deploy": "bun run build && bunx wrangler pages deploy docs/dist",
+		"deploy": "bun run build && sequoia inject && bunx wrangler pages deploy docs/dist",
 		"preview": "vocs preview"
 	},
 	"dependencies": {
