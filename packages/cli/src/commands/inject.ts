@@ -7,8 +7,7 @@ import { loadConfig, loadState, findConfig } from "../lib/config";
 
 export const injectCommand = command({
 	name: "inject",
-	description:
-		"Inject site.standard.document link tags into built HTML files",
+	description: "Inject site.standard.document link tags into built HTML files",
 	args: {
 		outputDir: option({
 			long: "output",
@@ -53,7 +52,7 @@ export const injectCommand = command({
 				slugToAtUri.set(postState.slug, postState.atUri);
 
 				// Also add the last segment for simpler matching
-				// e.g., "40th-puzzle-box/what-a-gift" -> also map "what-a-gift"
+				// e.g., "other/my-other-post" -> also map "my-other-post"
 				const lastSegment = postState.slug.split("/").pop();
 				if (lastSegment && lastSegment !== postState.slug) {
 					slugToAtUri.set(lastSegment, postState.atUri);
