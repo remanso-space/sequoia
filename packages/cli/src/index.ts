@@ -31,7 +31,7 @@ const app = subcommands({
 
 Publish evergreen content to the ATmosphere
 
-> https://tanlged.org/stevedylan.dev/sequoia
+> https://tangled.org/stevedylan.dev/sequoia
 	`,
 	version: "0.1.0",
 	cmds: {
