@@ -5,6 +5,7 @@ export interface FrontmatterMapping {
 	coverImage?: string; // Field name for cover image (default: "ogImage")
 	tags?: string; // Field name for tags (default: "tags")
 	draft?: string; // Field name for draft status (default: "draft")
+	slugField?: string; // Frontmatter field to use for slug (if set, uses frontmatter value; otherwise uses filepath)
 }
 
 // Strong reference for Bluesky post (com.atproto.repo.strongRef)
@@ -31,8 +32,6 @@ export interface PublisherConfig {
 	identity?: string; // Which stored identity to use (matches identifier)
 	frontmatter?: FrontmatterMapping; // Custom frontmatter field mappings
 	ignore?: string[]; // Glob patterns for files to ignore (e.g., ["_index.md", "**/drafts/**"])
-	slugSource?: "filename" | "path" | "frontmatter"; // How to generate slugs (default: "filename")
-	slugField?: string; // Frontmatter field to use when slugSource is "frontmatter" (default: "slug")
 	removeIndexFromSlug?: boolean; // Remove "/index" or "/_index" suffix from paths (default: false)
 	textContentField?: string; // Frontmatter field to use for textContent instead of markdown body
 	bluesky?: BlueskyConfig; // Optional Bluesky posting configuration

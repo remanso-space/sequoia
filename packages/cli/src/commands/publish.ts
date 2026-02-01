@@ -108,8 +108,7 @@ export const publishCommand = command({
 		const posts = await scanContentDirectory(contentDir, {
 			frontmatterMapping: config.frontmatter,
 			ignorePatterns: config.ignore,
-			slugSource: config.slugSource,
-			slugField: config.slugField,
+			slugField: config.frontmatter?.slugField,
 			removeIndexFromSlug: config.removeIndexFromSlug,
 		});
 		s.stop(`Found ${posts.length} posts`);

@@ -103,8 +103,7 @@ export const syncCommand = command({
 		const localPosts = await scanContentDirectory(contentDir, {
 			frontmatterMapping: config.frontmatter,
 			ignorePatterns: config.ignore,
-			slugSource: config.slugSource,
-			slugField: config.slugField,
+			slugField: config.frontmatter?.slugField,
 			removeIndexFromSlug: config.removeIndexFromSlug,
 		});
 		s.stop(`Found ${localPosts.length} local posts`);

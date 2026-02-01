@@ -176,7 +176,6 @@ export function getSlugFromFilename(filename: string): string {
 }
 
 export interface SlugOptions {
-	slugSource?: "filename" | "path" | "frontmatter";
 	slugField?: string;
 	removeIndexFromSlug?: boolean;
 }
@@ -186,43 +185,32 @@ export function getSlugFromOptions(
 	rawFrontmatter: Record<string, unknown>,
 	options: SlugOptions = {},
 ): string {
-	const {
-		slugSource = "filename",
-		slugField = "slug",
-		removeIndexFromSlug = false,
-	} = options;
+	const { slugField, removeIndexFromSlug = false } = options;
 
 	let slug: string;
 
-	switch (slugSource) {
-		case "path":
-			// Use full relative path without extension
+	// If slugField is set, try to get the value from frontmatter
+	if (slugField) {
+		const frontmatterValue = rawFrontmatter[slugField];
+		if (frontmatterValue && typeof frontmatterValue === "string") {
+			// Remove leading slash if present
+			slug = frontmatterValue
+				.replace(/^\//, "")
+				.toLowerCase()
+				.replace(/\s+/g, "-");
+		} else {
+			// Fallback to filepath if frontmatter field not found
 			slug = relativePath
 				.replace(/\.mdx?$/, "")
 				.toLowerCase()
 				.replace(/\s+/g, "-");
-			break;
-
-		case "frontmatter": {
-			// Use frontmatter field (slug or url)
-			const frontmatterValue =
-				rawFrontmatter[slugField] || rawFrontmatter.slug || rawFrontmatter.url;
-			if (frontmatterValue && typeof frontmatterValue === "string") {
-				// Remove leading slash if present
-				slug = frontmatterValue
-					.replace(/^\//, "")
-					.toLowerCase()
-					.replace(/\s+/g, "-");
-			} else {
-				// Fallback to filename if frontmatter field not found
-				slug = getSlugFromFilename(path.basename(relativePath));
-			}
-			break;
 		}
-
-		default:
-			slug = getSlugFromFilename(path.basename(relativePath));
-			break;
+	} else {
+		// Default: use filepath
+		slug = relativePath
+			.replace(/\.mdx?$/, "")
+			.toLowerCase()
+			.replace(/\s+/g, "-");
 	}
 
 	// Remove /index or /_index suffix if configured
@@ -253,7 +241,6 @@ function shouldIgnore(relativePath: string, ignorePatterns: string[]): boolean {
 export interface ScanOptions {
 	frontmatterMapping?: FrontmatterMapping;
 	ignorePatterns?: string[];
-	slugSource?: "filename" | "path" | "frontmatter";
 	slugField?: string;
 	removeIndexFromSlug?: boolean;
 }
@@ -267,9 +254,9 @@ export async function scanContentDirectory(
 	let options: ScanOptions;
 	if (
 		frontmatterMappingOrOptions &&
-		("slugSource" in frontmatterMappingOrOptions ||
-			"frontmatterMapping" in frontmatterMappingOrOptions ||
-			"ignorePatterns" in frontmatterMappingOrOptions)
+		("frontmatterMapping" in frontmatterMappingOrOptions ||
+			"ignorePatterns" in frontmatterMappingOrOptions ||
+			"slugField" in frontmatterMappingOrOptions)
 	) {
 		options = frontmatterMappingOrOptions as ScanOptions;
 	} else {
@@ -285,7 +272,6 @@ export async function scanContentDirectory(
 	const {
 		frontmatterMapping,
 		ignorePatterns: ignore = [],
-		slugSource,
 		slugField,
 		removeIndexFromSlug,
 	} = options;
@@ -314,7 +300,6 @@ export async function scanContentDirectory(
 					frontmatterMapping,
 				);
 				const slug = getSlugFromOptions(relativePath, rawFrontmatter, {
-					slugSource,
 					slugField,
 					removeIndexFromSlug,
 				});
