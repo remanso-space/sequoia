@@ -4,13 +4,13 @@ import { select, spinner, log } from "@clack/prompts";
 import * as path from "path";
 import { loadConfig, loadState, saveState, findConfig } from "../lib/config";
 import { loadCredentials, listCredentials, getCredentials } from "../lib/credentials";
-import { createAgent, createDocument, updateDocument, uploadImage, resolveImagePath } from "../lib/atproto";
+import { createAgent, createDocument, updateDocument, uploadImage, resolveImagePath, createBlueskyPost, addBskyPostRefToDocument } from "../lib/atproto";
 import {
   scanContentDirectory,
   getContentHash,
   updateFrontmatterWithAtUri,
 } from "../lib/markdown";
-import type { BlogPost, BlobObject } from "../lib/types";
+import type { BlogPost, BlobObject, StrongRef } from "../lib/types";
 import { exitOnCancel } from "../lib/prompts";
 
 export const publishCommand = command({
@@ -131,12 +131,39 @@ export const publishCommand = command({
     }
 
     log.info(`\n${postsToPublish.length} posts to publish:\n`);
+
+    // Bluesky posting configuration
+    const blueskyEnabled = config.bluesky?.enabled ?? false;
+    const maxAgeDays = config.bluesky?.maxAgeDays ?? 7;
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - maxAgeDays);
+
     for (const { post, action, reason } of postsToPublish) {
       const icon = action === "create" ? "+" : "~";
-      log.message(`  ${icon} ${post.frontmatter.title} (${reason})`);
+      const relativeFilePath = path.relative(configDir, post.filePath);
+      const existingBskyPostRef = state.posts[relativeFilePath]?.bskyPostRef;
+
+      let bskyNote = "";
+      if (blueskyEnabled) {
+        if (existingBskyPostRef) {
+          bskyNote = " [bsky: exists]";
+        } else {
+          const publishDate = new Date(post.frontmatter.publishDate);
+          if (publishDate < cutoffDate) {
+            bskyNote = ` [bsky: skipped, older than ${maxAgeDays} days]`;
+          } else {
+            bskyNote = " [bsky: will post]";
+          }
+        }
+      }
+
+      log.message(`  ${icon} ${post.frontmatter.title} (${reason})${bskyNote}`);
     }
 
     if (dryRun) {
+      if (blueskyEnabled) {
+        log.info(`\nBluesky posting: enabled (max age: ${maxAgeDays} days)`);
+      }
       log.info("\nDry run complete. No changes made.");
       return;
     }
@@ -157,6 +184,7 @@ export const publishCommand = command({
     let publishedCount = 0;
     let updatedCount = 0;
     let errorCount = 0;
+    let bskyPostCount = 0;
 
     for (const { post, action } of postsToPublish) {
       s.start(`Publishing: ${post.frontmatter.title}`);
@@ -182,9 +210,14 @@ export const publishCommand = command({
           }
         }
 
-        // Track atUri and content for state saving
+        // Track atUri, content for state saving, and bskyPostRef
         let atUri: string;
         let contentForHash: string;
+        let bskyPostRef: StrongRef | undefined;
+        const relativeFilePath = path.relative(configDir, post.filePath);
+
+        // Check if bskyPostRef already exists in state
+        const existingBskyPostRef = state.posts[relativeFilePath]?.bskyPostRef;
 
         if (action === "create") {
           atUri = await createDocument(agent, post, config, coverImage);
@@ -208,13 +241,49 @@ export const publishCommand = command({
           updatedCount++;
         }
 
+        // Create Bluesky post if enabled and conditions are met
+        if (blueskyEnabled) {
+          if (existingBskyPostRef) {
+            log.info(`  Bluesky post already exists, skipping`);
+            bskyPostRef = existingBskyPostRef;
+          } else {
+            const publishDate = new Date(post.frontmatter.publishDate);
+
+            if (publishDate < cutoffDate) {
+              log.info(`  Post is older than ${maxAgeDays} days, skipping Bluesky post`);
+            } else {
+              // Create Bluesky post
+              try {
+                const pathPrefix = config.pathPrefix || "/posts";
+                const canonicalUrl = `${config.siteUrl}${pathPrefix}/${post.slug}`;
+
+                bskyPostRef = await createBlueskyPost(agent, {
+                  title: post.frontmatter.title,
+                  description: post.frontmatter.description,
+                  canonicalUrl,
+                  coverImage,
+                  publishedAt: post.frontmatter.publishDate,
+                });
+
+                // Update document record with bskyPostRef
+                await addBskyPostRefToDocument(agent, atUri, bskyPostRef);
+                log.info(`  Created Bluesky post: ${bskyPostRef.uri}`);
+                bskyPostCount++;
+              } catch (bskyError) {
+                const errorMsg = bskyError instanceof Error ? bskyError.message : String(bskyError);
+                log.warn(`  Failed to create Bluesky post: ${errorMsg}`);
+              }
+            }
+          }
+        }
+
         // Update state (use relative path from config directory)
         const contentHash = await getContentHash(contentForHash);
-        const relativeFilePath = path.relative(configDir, post.filePath);
         state.posts[relativeFilePath] = {
           contentHash,
           atUri,
           lastPublished: new Date().toISOString(),
+          bskyPostRef,
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -231,6 +300,9 @@ export const publishCommand = command({
     log.message("\n---");
     log.info(`Published: ${publishedCount}`);
     log.info(`Updated: ${updatedCount}`);
+    if (bskyPostCount > 0) {
+      log.info(`Bluesky posts: ${bskyPostCount}`);
+    }
     if (errorCount > 0) {
       log.warn(`Errors: ${errorCount}`);
     }

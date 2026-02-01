@@ -6,6 +6,18 @@ export interface FrontmatterMapping {
 	tags?: string; // Field name for tags (default: "tags")
 }
 
+// Strong reference for Bluesky post (com.atproto.repo.strongRef)
+export interface StrongRef {
+	uri: string; // at:// URI format
+	cid: string; // Content ID
+}
+
+// Bluesky posting configuration
+export interface BlueskyConfig {
+	enabled: boolean;
+	maxAgeDays?: number; // Only post if published within N days (default: 7)
+}
+
 export interface PublisherConfig {
 	siteUrl: string;
 	contentDir: string;
@@ -18,6 +30,7 @@ export interface PublisherConfig {
 	identity?: string; // Which stored identity to use (matches identifier)
 	frontmatter?: FrontmatterMapping; // Custom frontmatter field mappings
 	ignore?: string[]; // Glob patterns for files to ignore (e.g., ["_index.md", "**/drafts/**"])
+	bluesky?: BlueskyConfig; // Optional Bluesky posting configuration
 }
 
 export interface Credentials {
@@ -62,6 +75,7 @@ export interface PostState {
 	contentHash: string;
 	atUri?: string;
 	lastPublished?: string;
+	bskyPostRef?: StrongRef; // Reference to corresponding Bluesky post
 }
 
 export interface PublicationRecord {
