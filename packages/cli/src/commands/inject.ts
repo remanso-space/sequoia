@@ -1,9 +1,9 @@
-import * as fs from "fs/promises";
-import { command, flag, option, optional, string } from "cmd-ts";
 import { log } from "@clack/prompts";
-import * as path from "path";
+import { command, flag, option, optional, string } from "cmd-ts";
 import { glob } from "glob";
-import { loadConfig, loadState, findConfig } from "../lib/config";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+import { findConfig, loadConfig, loadState } from "../lib/config";
 
 export const injectCommand = command({
 	name: "inject",

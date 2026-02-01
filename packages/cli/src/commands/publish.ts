@@ -1,7 +1,7 @@
-import * as fs from "fs/promises";
+import * as fs from "node:fs/promises";
 import { command, flag } from "cmd-ts";
 import { select, spinner, log } from "@clack/prompts";
-import * as path from "path";
+import * as path from "node:path";
 import { loadConfig, loadState, saveState, findConfig } from "../lib/config";
 import {
 	loadCredentials,

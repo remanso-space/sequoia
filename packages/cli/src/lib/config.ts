@@ -1,6 +1,11 @@
-import * as fs from "fs/promises";
-import * as path from "path";
-import type { PublisherConfig, PublisherState, FrontmatterMapping, BlueskyConfig } from "./types";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+import type {
+	PublisherConfig,
+	PublisherState,
+	FrontmatterMapping,
+	BlueskyConfig,
+} from "./types";
 
 const CONFIG_FILENAME = "sequoia.json";
 const STATE_FILENAME = ".sequoia-state.json";
@@ -131,6 +136,7 @@ export function generateConfigTemplate(options: {
 
 	if (options.textContentField) {
 		config.textContentField = options.textContentField;
+	}
 	if (options.bluesky) {
 		config.bluesky = options.bluesky;
 	}

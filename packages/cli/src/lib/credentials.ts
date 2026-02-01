@@ -1,6 +1,6 @@
-import * as fs from "fs/promises";
-import * as path from "path";
-import * as os from "os";
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
 import type { Credentials } from "./types";
 
 const CONFIG_DIR = path.join(os.homedir(), ".config", "sequoia");
@@ -10,45 +10,45 @@ const CREDENTIALS_FILE = path.join(CONFIG_DIR, "credentials.json");
 type CredentialsStore = Record<string, Credentials>;
 
 async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
+	try {
+		await fs.access(filePath);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 /**
  * Load all stored credentials
  */
 async function loadCredentialsStore(): Promise<CredentialsStore> {
-  if (!(await fileExists(CREDENTIALS_FILE))) {
-    return {};
-  }
+	if (!(await fileExists(CREDENTIALS_FILE))) {
+		return {};
+	}
 
-  try {
-    const content = await fs.readFile(CREDENTIALS_FILE, "utf-8");
-    const parsed = JSON.parse(content);
+	try {
+		const content = await fs.readFile(CREDENTIALS_FILE, "utf-8");
+		const parsed = JSON.parse(content);
 
-    // Handle legacy single-credential format (migrate on read)
-    if (parsed.identifier && parsed.password) {
-      const legacy = parsed as Credentials;
-      return { [legacy.identifier]: legacy };
-    }
+		// Handle legacy single-credential format (migrate on read)
+		if (parsed.identifier && parsed.password) {
+			const legacy = parsed as Credentials;
+			return { [legacy.identifier]: legacy };
+		}
 
-    return parsed as CredentialsStore;
-  } catch {
-    return {};
-  }
+		return parsed as CredentialsStore;
+	} catch {
+		return {};
+	}
 }
 
 /**
  * Save the entire credentials store
  */
 async function saveCredentialsStore(store: CredentialsStore): Promise<void> {
-  await fs.mkdir(CONFIG_DIR, { recursive: true });
-  await fs.writeFile(CREDENTIALS_FILE, JSON.stringify(store, null, 2));
-  await fs.chmod(CREDENTIALS_FILE, 0o600);
+	await fs.mkdir(CONFIG_DIR, { recursive: true });
+	await fs.writeFile(CREDENTIALS_FILE, JSON.stringify(store, null, 2));
+	await fs.chmod(CREDENTIALS_FILE, 0o600);
 }
 
 /**
@@ -62,107 +62,107 @@ async function saveCredentialsStore(store: CredentialsStore): Promise<void> {
  * 5. Return null (caller should prompt user)
  */
 export async function loadCredentials(
-  projectIdentity?: string
+	projectIdentity?: string,
 ): Promise<Credentials | null> {
-  // 1. Check environment variables first (full override)
-  const envIdentifier = process.env.ATP_IDENTIFIER;
-  const envPassword = process.env.ATP_APP_PASSWORD;
-  const envPdsUrl = process.env.PDS_URL;
+	// 1. Check environment variables first (full override)
+	const envIdentifier = process.env.ATP_IDENTIFIER;
+	const envPassword = process.env.ATP_APP_PASSWORD;
+	const envPdsUrl = process.env.PDS_URL;
 
-  if (envIdentifier && envPassword) {
-    return {
-      identifier: envIdentifier,
-      password: envPassword,
-      pdsUrl: envPdsUrl || "https://bsky.social",
-    };
-  }
+	if (envIdentifier && envPassword) {
+		return {
+			identifier: envIdentifier,
+			password: envPassword,
+			pdsUrl: envPdsUrl || "https://bsky.social",
+		};
+	}
 
-  const store = await loadCredentialsStore();
-  const identifiers = Object.keys(store);
+	const store = await loadCredentialsStore();
+	const identifiers = Object.keys(store);
 
-  if (identifiers.length === 0) {
-    return null;
-  }
+	if (identifiers.length === 0) {
+		return null;
+	}
 
-  // 2. SEQUOIA_PROFILE env var
-  const profileEnv = process.env.SEQUOIA_PROFILE;
-  if (profileEnv && store[profileEnv]) {
-    return store[profileEnv];
-  }
+	// 2. SEQUOIA_PROFILE env var
+	const profileEnv = process.env.SEQUOIA_PROFILE;
+	if (profileEnv && store[profileEnv]) {
+		return store[profileEnv];
+	}
 
-  // 3. Project-specific identity (from sequoia.json)
-  if (projectIdentity && store[projectIdentity]) {
-    return store[projectIdentity];
-  }
+	// 3. Project-specific identity (from sequoia.json)
+	if (projectIdentity && store[projectIdentity]) {
+		return store[projectIdentity];
+	}
 
-  // 4. If only one identity, use it
-  if (identifiers.length === 1 && identifiers[0]) {
-    return store[identifiers[0]] ?? null;
-  }
+	// 4. If only one identity, use it
+	if (identifiers.length === 1 && identifiers[0]) {
+		return store[identifiers[0]] ?? null;
+	}
 
-  // Multiple identities exist but none selected
-  return null;
+	// Multiple identities exist but none selected
+	return null;
 }
 
 /**
  * Get a specific identity by identifier
  */
 export async function getCredentials(
-  identifier: string
+	identifier: string,
 ): Promise<Credentials | null> {
-  const store = await loadCredentialsStore();
-  return store[identifier] || null;
+	const store = await loadCredentialsStore();
+	return store[identifier] || null;
 }
 
 /**
  * List all stored identities
  */
 export async function listCredentials(): Promise<string[]> {
-  const store = await loadCredentialsStore();
-  return Object.keys(store);
+	const store = await loadCredentialsStore();
+	return Object.keys(store);
 }
 
 /**
  * Save credentials for an identity (adds or updates)
  */
 export async function saveCredentials(credentials: Credentials): Promise<void> {
-  const store = await loadCredentialsStore();
-  store[credentials.identifier] = credentials;
-  await saveCredentialsStore(store);
+	const store = await loadCredentialsStore();
+	store[credentials.identifier] = credentials;
+	await saveCredentialsStore(store);
 }
 
 /**
  * Delete credentials for a specific identity
  */
 export async function deleteCredentials(identifier?: string): Promise<boolean> {
-  const store = await loadCredentialsStore();
-  const identifiers = Object.keys(store);
+	const store = await loadCredentialsStore();
+	const identifiers = Object.keys(store);
 
-  if (identifiers.length === 0) {
-    return false;
-  }
+	if (identifiers.length === 0) {
+		return false;
+	}
 
-  // If identifier specified, delete just that one
-  if (identifier) {
-    if (!store[identifier]) {
-      return false;
-    }
-    delete store[identifier];
-    await saveCredentialsStore(store);
-    return true;
-  }
+	// If identifier specified, delete just that one
+	if (identifier) {
+		if (!store[identifier]) {
+			return false;
+		}
+		delete store[identifier];
+		await saveCredentialsStore(store);
+		return true;
+	}
 
-  // If only one identity, delete it (backwards compat behavior)
-  if (identifiers.length === 1 && identifiers[0]) {
-    delete store[identifiers[0]];
-    await saveCredentialsStore(store);
-    return true;
-  }
+	// If only one identity, delete it (backwards compat behavior)
+	if (identifiers.length === 1 && identifiers[0]) {
+		delete store[identifiers[0]];
+		await saveCredentialsStore(store);
+		return true;
+	}
 
-  // Multiple identities but none specified
-  return false;
+	// Multiple identities but none specified
+	return false;
 }
 
 export function getCredentialsPath(): string {
-  return CREDENTIALS_FILE;
+	return CREDENTIALS_FILE;
 }

@@ -1,552 +1,579 @@
 import { AtpAgent } from "@atproto/api";
-import * as fs from "fs/promises";
-import * as path from "path";
 import * as mimeTypes from "mime-types";
-import type { Credentials, BlogPost, BlobObject, PublisherConfig, StrongRef } from "./types";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import { stripMarkdownForText } from "./markdown";
+import type {
+	BlobObject,
+	BlogPost,
+	Credentials,
+	PublisherConfig,
+	StrongRef,
+} from "./types";
 
 async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
+	try {
+		await fs.access(filePath);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 export async function resolveHandleToPDS(handle: string): Promise<string> {
-  // First, resolve the handle to a DID
-  let did: string;
+	// First, resolve the handle to a DID
+	let did: string;
 
-  if (handle.startsWith("did:")) {
-    did = handle;
-  } else {
-    // Try to resolve handle via Bluesky API
-    const resolveUrl = `https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(handle)}`;
-    const resolveResponse = await fetch(resolveUrl);
-    if (!resolveResponse.ok) {
-      throw new Error("Could not resolve handle");
-    }
-    const resolveData = (await resolveResponse.json()) as { did: string };
-    did = resolveData.did;
-  }
+	if (handle.startsWith("did:")) {
+		did = handle;
+	} else {
+		// Try to resolve handle via Bluesky API
+		const resolveUrl = `https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(handle)}`;
+		const resolveResponse = await fetch(resolveUrl);
+		if (!resolveResponse.ok) {
+			throw new Error("Could not resolve handle");
+		}
+		const resolveData = (await resolveResponse.json()) as { did: string };
+		did = resolveData.did;
+	}
 
-  // Now resolve the DID to get the PDS URL from the DID document
-  let pdsUrl: string | undefined;
+	// Now resolve the DID to get the PDS URL from the DID document
+	let pdsUrl: string | undefined;
 
-  if (did.startsWith("did:plc:")) {
-    // Fetch DID document from plc.directory
-    const didDocUrl = `https://plc.directory/${did}`;
-    const didDocResponse = await fetch(didDocUrl);
-    if (!didDocResponse.ok) {
-      throw new Error("Could not fetch DID document");
-    }
-    const didDoc = (await didDocResponse.json()) as {
-      service?: Array<{ id: string; type: string; serviceEndpoint: string }>;
-    };
+	if (did.startsWith("did:plc:")) {
+		// Fetch DID document from plc.directory
+		const didDocUrl = `https://plc.directory/${did}`;
+		const didDocResponse = await fetch(didDocUrl);
+		if (!didDocResponse.ok) {
+			throw new Error("Could not fetch DID document");
+		}
+		const didDoc = (await didDocResponse.json()) as {
+			service?: Array<{ id: string; type: string; serviceEndpoint: string }>;
+		};
 
-    // Find the PDS service endpoint
-    const pdsService = didDoc.service?.find(
-      (s) => s.id === "#atproto_pds" || s.type === "AtprotoPersonalDataServer",
-    );
-    pdsUrl = pdsService?.serviceEndpoint;
-  } else if (did.startsWith("did:web:")) {
-    // For did:web, fetch the DID document from the domain
-    const domain = did.replace("did:web:", "");
-    const didDocUrl = `https://${domain}/.well-known/did.json`;
-    const didDocResponse = await fetch(didDocUrl);
-    if (!didDocResponse.ok) {
-      throw new Error("Could not fetch DID document");
-    }
-    const didDoc = (await didDocResponse.json()) as {
-      service?: Array<{ id: string; type: string; serviceEndpoint: string }>;
-    };
+		// Find the PDS service endpoint
+		const pdsService = didDoc.service?.find(
+			(s) => s.id === "#atproto_pds" || s.type === "AtprotoPersonalDataServer",
+		);
+		pdsUrl = pdsService?.serviceEndpoint;
+	} else if (did.startsWith("did:web:")) {
+		// For did:web, fetch the DID document from the domain
+		const domain = did.replace("did:web:", "");
+		const didDocUrl = `https://${domain}/.well-known/did.json`;
+		const didDocResponse = await fetch(didDocUrl);
+		if (!didDocResponse.ok) {
+			throw new Error("Could not fetch DID document");
+		}
+		const didDoc = (await didDocResponse.json()) as {
+			service?: Array<{ id: string; type: string; serviceEndpoint: string }>;
+		};
 
-    const pdsService = didDoc.service?.find(
-      (s) => s.id === "#atproto_pds" || s.type === "AtprotoPersonalDataServer",
-    );
-    pdsUrl = pdsService?.serviceEndpoint;
-  }
+		const pdsService = didDoc.service?.find(
+			(s) => s.id === "#atproto_pds" || s.type === "AtprotoPersonalDataServer",
+		);
+		pdsUrl = pdsService?.serviceEndpoint;
+	}
 
-  if (!pdsUrl) {
-    throw new Error("Could not find PDS URL for user");
-  }
+	if (!pdsUrl) {
+		throw new Error("Could not find PDS URL for user");
+	}
 
-  return pdsUrl;
+	return pdsUrl;
 }
 
 export interface CreatePublicationOptions {
-  url: string;
-  name: string;
-  description?: string;
-  iconPath?: string;
-  showInDiscover?: boolean;
+	url: string;
+	name: string;
+	description?: string;
+	iconPath?: string;
+	showInDiscover?: boolean;
 }
 
 export async function createAgent(credentials: Credentials): Promise<AtpAgent> {
-  const agent = new AtpAgent({ service: credentials.pdsUrl });
+	const agent = new AtpAgent({ service: credentials.pdsUrl });
 
-  await agent.login({
-    identifier: credentials.identifier,
-    password: credentials.password,
-  });
+	await agent.login({
+		identifier: credentials.identifier,
+		password: credentials.password,
+	});
 
-  return agent;
+	return agent;
 }
 
 export async function uploadImage(
-  agent: AtpAgent,
-  imagePath: string
+	agent: AtpAgent,
+	imagePath: string,
 ): Promise<BlobObject | undefined> {
-  if (!(await fileExists(imagePath))) {
-    return undefined;
-  }
+	if (!(await fileExists(imagePath))) {
+		return undefined;
+	}
 
-  try {
-    const imageBuffer = await fs.readFile(imagePath);
-    const mimeType = mimeTypes.lookup(imagePath) || "application/octet-stream";
+	try {
+		const imageBuffer = await fs.readFile(imagePath);
+		const mimeType = mimeTypes.lookup(imagePath) || "application/octet-stream";
 
-    const response = await agent.com.atproto.repo.uploadBlob(
-      new Uint8Array(imageBuffer),
-      {
-        encoding: mimeType,
-      }
-    );
+		const response = await agent.com.atproto.repo.uploadBlob(
+			new Uint8Array(imageBuffer),
+			{
+				encoding: mimeType,
+			},
+		);
 
-    return {
-      $type: "blob",
-      ref: {
-        $link: response.data.blob.ref.toString(),
-      },
-      mimeType,
-      size: imageBuffer.byteLength,
-    };
-  } catch (error) {
-    console.error(`Error uploading image ${imagePath}:`, error);
-    return undefined;
-  }
+		return {
+			$type: "blob",
+			ref: {
+				$link: response.data.blob.ref.toString(),
+			},
+			mimeType,
+			size: imageBuffer.byteLength,
+		};
+	} catch (error) {
+		console.error(`Error uploading image ${imagePath}:`, error);
+		return undefined;
+	}
 }
 
 export async function resolveImagePath(
-  ogImage: string,
-  imagesDir: string | undefined,
-  contentDir: string
+	ogImage: string,
+	imagesDir: string | undefined,
+	contentDir: string,
 ): Promise<string | null> {
-  // Try multiple resolution strategies
-  const filename = path.basename(ogImage);
+	// Try multiple resolution strategies
+	const filename = path.basename(ogImage);
 
-  // 1. If imagesDir is specified, look there
-  if (imagesDir) {
-    const imagePath = path.join(imagesDir, filename);
-    if (await fileExists(imagePath)) {
-      const stat = await fs.stat(imagePath);
-      if (stat.size > 0) {
-        return imagePath;
-      }
-    }
-  }
+	// 1. If imagesDir is specified, look there
+	if (imagesDir) {
+		const imagePath = path.join(imagesDir, filename);
+		if (await fileExists(imagePath)) {
+			const stat = await fs.stat(imagePath);
+			if (stat.size > 0) {
+				return imagePath;
+			}
+		}
+	}
 
-  // 2. Try the ogImage path directly (if it's absolute)
-  if (path.isAbsolute(ogImage)) {
-    return ogImage;
-  }
+	// 2. Try the ogImage path directly (if it's absolute)
+	if (path.isAbsolute(ogImage)) {
+		return ogImage;
+	}
 
-  // 3. Try relative to content directory
-  const contentRelative = path.join(contentDir, ogImage);
-  if (await fileExists(contentRelative)) {
-    const stat = await fs.stat(contentRelative);
-    if (stat.size > 0) {
-      return contentRelative;
-    }
-  }
+	// 3. Try relative to content directory
+	const contentRelative = path.join(contentDir, ogImage);
+	if (await fileExists(contentRelative)) {
+		const stat = await fs.stat(contentRelative);
+		if (stat.size > 0) {
+			return contentRelative;
+		}
+	}
 
-  return null;
+	return null;
 }
 
 export async function createDocument(
-  agent: AtpAgent,
-  post: BlogPost,
-  config: PublisherConfig,
-  coverImage?: BlobObject
+	agent: AtpAgent,
+	post: BlogPost,
+	config: PublisherConfig,
+	coverImage?: BlobObject,
 ): Promise<string> {
-  const pathPrefix = config.pathPrefix || "/posts";
-  const postPath = `${pathPrefix}/${post.slug}`;
-  const publishDate = new Date(post.frontmatter.publishDate);
+	const pathPrefix = config.pathPrefix || "/posts";
+	const postPath = `${pathPrefix}/${post.slug}`;
+	const publishDate = new Date(post.frontmatter.publishDate);
 
-  // Determine textContent: use configured field from frontmatter, or fallback to markdown body
-  let textContent: string;
-  if (config.textContentField && post.rawFrontmatter?.[config.textContentField]) {
-    textContent = String(post.rawFrontmatter[config.textContentField]);
-  } else {
-    textContent = stripMarkdownForText(post.content);
-  }
+	// Determine textContent: use configured field from frontmatter, or fallback to markdown body
+	let textContent: string;
+	if (
+		config.textContentField &&
+		post.rawFrontmatter?.[config.textContentField]
+	) {
+		textContent = String(post.rawFrontmatter[config.textContentField]);
+	} else {
+		textContent = stripMarkdownForText(post.content);
+	}
 
-  const record: Record<string, unknown> = {
-    $type: "site.standard.document",
-    title: post.frontmatter.title,
-    site: config.publicationUri,
-    path: postPath,
-    textContent: textContent.slice(0, 10000),
-    publishedAt: publishDate.toISOString(),
-    canonicalUrl: `${config.siteUrl}${postPath}`,
-  };
+	const record: Record<string, unknown> = {
+		$type: "site.standard.document",
+		title: post.frontmatter.title,
+		site: config.publicationUri,
+		path: postPath,
+		textContent: textContent.slice(0, 10000),
+		publishedAt: publishDate.toISOString(),
+		canonicalUrl: `${config.siteUrl}${postPath}`,
+	};
 
-  if (post.frontmatter.description) {
-    record.description = post.frontmatter.description;
-  }
+	if (post.frontmatter.description) {
+		record.description = post.frontmatter.description;
+	}
 
-  if (coverImage) {
-    record.coverImage = coverImage;
-  }
+	if (coverImage) {
+		record.coverImage = coverImage;
+	}
 
-  if (post.frontmatter.tags && post.frontmatter.tags.length > 0) {
-    record.tags = post.frontmatter.tags;
-  }
+	if (post.frontmatter.tags && post.frontmatter.tags.length > 0) {
+		record.tags = post.frontmatter.tags;
+	}
 
-  const response = await agent.com.atproto.repo.createRecord({
-    repo: agent.session!.did,
-    collection: "site.standard.document",
-    record,
-  });
+	const response = await agent.com.atproto.repo.createRecord({
+		repo: agent.session!.did,
+		collection: "site.standard.document",
+		record,
+	});
 
-  return response.data.uri;
+	return response.data.uri;
 }
 
 export async function updateDocument(
-  agent: AtpAgent,
-  post: BlogPost,
-  atUri: string,
-  config: PublisherConfig,
-  coverImage?: BlobObject
+	agent: AtpAgent,
+	post: BlogPost,
+	atUri: string,
+	config: PublisherConfig,
+	coverImage?: BlobObject,
 ): Promise<void> {
-  // Parse the atUri to get the collection and rkey
-  // Format: at://did:plc:xxx/collection/rkey
-  const uriMatch = atUri.match(/^at:\/\/([^/]+)\/([^/]+)\/(.+)$/);
-  if (!uriMatch) {
-    throw new Error(`Invalid atUri format: ${atUri}`);
-  }
+	// Parse the atUri to get the collection and rkey
+	// Format: at://did:plc:xxx/collection/rkey
+	const uriMatch = atUri.match(/^at:\/\/([^/]+)\/([^/]+)\/(.+)$/);
+	if (!uriMatch) {
+		throw new Error(`Invalid atUri format: ${atUri}`);
+	}
 
-  const [, , collection, rkey] = uriMatch;
+	const [, , collection, rkey] = uriMatch;
 
-  const pathPrefix = config.pathPrefix || "/posts";
-  const postPath = `${pathPrefix}/${post.slug}`;
-  const publishDate = new Date(post.frontmatter.publishDate);
+	const pathPrefix = config.pathPrefix || "/posts";
+	const postPath = `${pathPrefix}/${post.slug}`;
+	const publishDate = new Date(post.frontmatter.publishDate);
 
-  // Determine textContent: use configured field from frontmatter, or fallback to markdown body
-  let textContent: string;
-  if (config.textContentField && post.rawFrontmatter?.[config.textContentField]) {
-    textContent = String(post.rawFrontmatter[config.textContentField]);
-  } else {
-    textContent = stripMarkdownForText(post.content);
-  }
+	// Determine textContent: use configured field from frontmatter, or fallback to markdown body
+	let textContent: string;
+	if (
+		config.textContentField &&
+		post.rawFrontmatter?.[config.textContentField]
+	) {
+		textContent = String(post.rawFrontmatter[config.textContentField]);
+	} else {
+		textContent = stripMarkdownForText(post.content);
+	}
 
-  const record: Record<string, unknown> = {
-    $type: "site.standard.document",
-    title: post.frontmatter.title,
-    site: config.publicationUri,
-    path: postPath,
-    textContent: textContent.slice(0, 10000),
-    publishedAt: publishDate.toISOString(),
-    canonicalUrl: `${config.siteUrl}${postPath}`,
-  };
+	const record: Record<string, unknown> = {
+		$type: "site.standard.document",
+		title: post.frontmatter.title,
+		site: config.publicationUri,
+		path: postPath,
+		textContent: textContent.slice(0, 10000),
+		publishedAt: publishDate.toISOString(),
+		canonicalUrl: `${config.siteUrl}${postPath}`,
+	};
 
-  if (post.frontmatter.description) {
-    record.description = post.frontmatter.description;
-  }
+	if (post.frontmatter.description) {
+		record.description = post.frontmatter.description;
+	}
 
-  if (coverImage) {
-    record.coverImage = coverImage;
-  }
+	if (coverImage) {
+		record.coverImage = coverImage;
+	}
 
-  if (post.frontmatter.tags && post.frontmatter.tags.length > 0) {
-    record.tags = post.frontmatter.tags;
-  }
+	if (post.frontmatter.tags && post.frontmatter.tags.length > 0) {
+		record.tags = post.frontmatter.tags;
+	}
 
-  await agent.com.atproto.repo.putRecord({
-    repo: agent.session!.did,
-    collection: collection!,
-    rkey: rkey!,
-    record,
-  });
+	await agent.com.atproto.repo.putRecord({
+		repo: agent.session!.did,
+		collection: collection!,
+		rkey: rkey!,
+		record,
+	});
 }
 
-export function parseAtUri(atUri: string): { did: string; collection: string; rkey: string } | null {
-  const match = atUri.match(/^at:\/\/([^/]+)\/([^/]+)\/(.+)$/);
-  if (!match) return null;
-  return {
-    did: match[1]!,
-    collection: match[2]!,
-    rkey: match[3]!,
-  };
+export function parseAtUri(
+	atUri: string,
+): { did: string; collection: string; rkey: string } | null {
+	const match = atUri.match(/^at:\/\/([^/]+)\/([^/]+)\/(.+)$/);
+	if (!match) return null;
+	return {
+		did: match[1]!,
+		collection: match[2]!,
+		rkey: match[3]!,
+	};
 }
 
 export interface DocumentRecord {
-  $type: "site.standard.document";
-  title: string;
-  site: string;
-  path: string;
-  textContent: string;
-  publishedAt: string;
-  canonicalUrl?: string;
-  description?: string;
-  coverImage?: BlobObject;
-  tags?: string[];
-  location?: string;
+	$type: "site.standard.document";
+	title: string;
+	site: string;
+	path: string;
+	textContent: string;
+	publishedAt: string;
+	canonicalUrl?: string;
+	description?: string;
+	coverImage?: BlobObject;
+	tags?: string[];
+	location?: string;
 }
 
 export interface ListDocumentsResult {
-  uri: string;
-  cid: string;
-  value: DocumentRecord;
+	uri: string;
+	cid: string;
+	value: DocumentRecord;
 }
 
 export async function listDocuments(
-  agent: AtpAgent,
-  publicationUri?: string
+	agent: AtpAgent,
+	publicationUri?: string,
 ): Promise<ListDocumentsResult[]> {
-  const documents: ListDocumentsResult[] = [];
-  let cursor: string | undefined;
+	const documents: ListDocumentsResult[] = [];
+	let cursor: string | undefined;
 
-  do {
-    const response = await agent.com.atproto.repo.listRecords({
-      repo: agent.session!.did,
-      collection: "site.standard.document",
-      limit: 100,
-      cursor,
-    });
+	do {
+		const response = await agent.com.atproto.repo.listRecords({
+			repo: agent.session!.did,
+			collection: "site.standard.document",
+			limit: 100,
+			cursor,
+		});
 
-    for (const record of response.data.records) {
-      const value = record.value as unknown as DocumentRecord;
+		for (const record of response.data.records) {
+			const value = record.value as unknown as DocumentRecord;
 
-      // If publicationUri is specified, only include documents from that publication
-      if (publicationUri && value.site !== publicationUri) {
-        continue;
-      }
+			// If publicationUri is specified, only include documents from that publication
+			if (publicationUri && value.site !== publicationUri) {
+				continue;
+			}
 
-      documents.push({
-        uri: record.uri,
-        cid: record.cid,
-        value,
-      });
-    }
+			documents.push({
+				uri: record.uri,
+				cid: record.cid,
+				value,
+			});
+		}
 
-    cursor = response.data.cursor;
-  } while (cursor);
+		cursor = response.data.cursor;
+	} while (cursor);
 
-  return documents;
+	return documents;
 }
 
 export async function createPublication(
-  agent: AtpAgent,
-  options: CreatePublicationOptions
+	agent: AtpAgent,
+	options: CreatePublicationOptions,
 ): Promise<string> {
-  let icon: BlobObject | undefined;
+	let icon: BlobObject | undefined;
 
-  if (options.iconPath) {
-    icon = await uploadImage(agent, options.iconPath);
-  }
+	if (options.iconPath) {
+		icon = await uploadImage(agent, options.iconPath);
+	}
 
-  const record: Record<string, unknown> = {
-    $type: "site.standard.publication",
-    url: options.url,
-    name: options.name,
-    createdAt: new Date().toISOString(),
-  };
+	const record: Record<string, unknown> = {
+		$type: "site.standard.publication",
+		url: options.url,
+		name: options.name,
+		createdAt: new Date().toISOString(),
+	};
 
-  if (options.description) {
-    record.description = options.description;
-  }
+	if (options.description) {
+		record.description = options.description;
+	}
 
-  if (icon) {
-    record.icon = icon;
-  }
+	if (icon) {
+		record.icon = icon;
+	}
 
-  if (options.showInDiscover !== undefined) {
-    record.preferences = {
-      showInDiscover: options.showInDiscover,
-    };
-  }
+	if (options.showInDiscover !== undefined) {
+		record.preferences = {
+			showInDiscover: options.showInDiscover,
+		};
+	}
 
-  const response = await agent.com.atproto.repo.createRecord({
-    repo: agent.session!.did,
-    collection: "site.standard.publication",
-    record,
-  });
+	const response = await agent.com.atproto.repo.createRecord({
+		repo: agent.session!.did,
+		collection: "site.standard.publication",
+		record,
+	});
 
-  return response.data.uri;
+	return response.data.uri;
 }
 
 // --- Bluesky Post Creation ---
 
 export interface CreateBlueskyPostOptions {
-  title: string;
-  description?: string;
-  canonicalUrl: string;
-  coverImage?: BlobObject;
-  publishedAt: string; // Used as createdAt for the post
+	title: string;
+	description?: string;
+	canonicalUrl: string;
+	coverImage?: BlobObject;
+	publishedAt: string; // Used as createdAt for the post
 }
 
 /**
  * Count graphemes in a string (for Bluesky's 300 grapheme limit)
  */
 function countGraphemes(str: string): number {
-  // Use Intl.Segmenter if available, otherwise fallback to spread operator
-  if (typeof Intl !== "undefined" && Intl.Segmenter) {
-    const segmenter = new Intl.Segmenter("en", { granularity: "grapheme" });
-    return [...segmenter.segment(str)].length;
-  }
-  return [...str].length;
+	// Use Intl.Segmenter if available, otherwise fallback to spread operator
+	if (typeof Intl !== "undefined" && Intl.Segmenter) {
+		const segmenter = new Intl.Segmenter("en", { granularity: "grapheme" });
+		return [...segmenter.segment(str)].length;
+	}
+	return [...str].length;
 }
 
 /**
  * Truncate a string to a maximum number of graphemes
  */
 function truncateToGraphemes(str: string, maxGraphemes: number): string {
-  if (typeof Intl !== "undefined" && Intl.Segmenter) {
-    const segmenter = new Intl.Segmenter("en", { granularity: "grapheme" });
-    const segments = [...segmenter.segment(str)];
-    if (segments.length <= maxGraphemes) return str;
-    return segments.slice(0, maxGraphemes - 3).map(s => s.segment).join("") + "...";
-  }
-  // Fallback
-  const chars = [...str];
-  if (chars.length <= maxGraphemes) return str;
-  return chars.slice(0, maxGraphemes - 3).join("") + "...";
+	if (typeof Intl !== "undefined" && Intl.Segmenter) {
+		const segmenter = new Intl.Segmenter("en", { granularity: "grapheme" });
+		const segments = [...segmenter.segment(str)];
+		if (segments.length <= maxGraphemes) return str;
+		return (
+			segments
+				.slice(0, maxGraphemes - 3)
+				.map((s) => s.segment)
+				.join("") + "..."
+		);
+	}
+	// Fallback
+	const chars = [...str];
+	if (chars.length <= maxGraphemes) return str;
+	return chars.slice(0, maxGraphemes - 3).join("") + "...";
 }
 
 /**
  * Create a Bluesky post with external link embed
  */
 export async function createBlueskyPost(
-  agent: AtpAgent,
-  options: CreateBlueskyPostOptions
+	agent: AtpAgent,
+	options: CreateBlueskyPostOptions,
 ): Promise<StrongRef> {
-  const { title, description, canonicalUrl, coverImage, publishedAt } = options;
+	const { title, description, canonicalUrl, coverImage, publishedAt } = options;
 
-  // Build post text: title + description + URL
-  // Max 300 graphemes for Bluesky posts
-  const MAX_GRAPHEMES = 300;
+	// Build post text: title + description + URL
+	// Max 300 graphemes for Bluesky posts
+	const MAX_GRAPHEMES = 300;
 
-  let postText: string;
-  const urlPart = `\n\n${canonicalUrl}`;
-  const urlGraphemes = countGraphemes(urlPart);
+	let postText: string;
+	const urlPart = `\n\n${canonicalUrl}`;
+	const urlGraphemes = countGraphemes(urlPart);
 
-  if (description) {
-    // Try: title + description + URL
-    const fullText = `${title}\n\n${description}${urlPart}`;
-    if (countGraphemes(fullText) <= MAX_GRAPHEMES) {
-      postText = fullText;
-    } else {
-      // Truncate description to fit
-      const availableForDesc = MAX_GRAPHEMES - countGraphemes(title) - countGraphemes("\n\n") - urlGraphemes - countGraphemes("\n\n");
-      if (availableForDesc > 10) {
-        const truncatedDesc = truncateToGraphemes(description, availableForDesc);
-        postText = `${title}\n\n${truncatedDesc}${urlPart}`;
-      } else {
-        // Just title + URL
-        postText = `${title}${urlPart}`;
-      }
-    }
-  } else {
-    // Just title + URL
-    postText = `${title}${urlPart}`;
-  }
+	if (description) {
+		// Try: title + description + URL
+		const fullText = `${title}\n\n${description}${urlPart}`;
+		if (countGraphemes(fullText) <= MAX_GRAPHEMES) {
+			postText = fullText;
+		} else {
+			// Truncate description to fit
+			const availableForDesc =
+				MAX_GRAPHEMES -
+				countGraphemes(title) -
+				countGraphemes("\n\n") -
+				urlGraphemes -
+				countGraphemes("\n\n");
+			if (availableForDesc > 10) {
+				const truncatedDesc = truncateToGraphemes(
+					description,
+					availableForDesc,
+				);
+				postText = `${title}\n\n${truncatedDesc}${urlPart}`;
+			} else {
+				// Just title + URL
+				postText = `${title}${urlPart}`;
+			}
+		}
+	} else {
+		// Just title + URL
+		postText = `${title}${urlPart}`;
+	}
 
-  // Final truncation if still too long (shouldn't happen but safety check)
-  if (countGraphemes(postText) > MAX_GRAPHEMES) {
-    postText = truncateToGraphemes(postText, MAX_GRAPHEMES);
-  }
+	// Final truncation if still too long (shouldn't happen but safety check)
+	if (countGraphemes(postText) > MAX_GRAPHEMES) {
+		postText = truncateToGraphemes(postText, MAX_GRAPHEMES);
+	}
 
-  // Calculate byte indices for the URL facet
-  const encoder = new TextEncoder();
-  const urlStartInText = postText.lastIndexOf(canonicalUrl);
-  const beforeUrl = postText.substring(0, urlStartInText);
-  const byteStart = encoder.encode(beforeUrl).length;
-  const byteEnd = byteStart + encoder.encode(canonicalUrl).length;
+	// Calculate byte indices for the URL facet
+	const encoder = new TextEncoder();
+	const urlStartInText = postText.lastIndexOf(canonicalUrl);
+	const beforeUrl = postText.substring(0, urlStartInText);
+	const byteStart = encoder.encode(beforeUrl).length;
+	const byteEnd = byteStart + encoder.encode(canonicalUrl).length;
 
-  // Build facets for the URL link
-  const facets = [
-    {
-      index: {
-        byteStart,
-        byteEnd,
-      },
-      features: [
-        {
-          $type: "app.bsky.richtext.facet#link",
-          uri: canonicalUrl,
-        },
-      ],
-    },
-  ];
+	// Build facets for the URL link
+	const facets = [
+		{
+			index: {
+				byteStart,
+				byteEnd,
+			},
+			features: [
+				{
+					$type: "app.bsky.richtext.facet#link",
+					uri: canonicalUrl,
+				},
+			],
+		},
+	];
 
-  // Build external embed
-  const embed: Record<string, unknown> = {
-    $type: "app.bsky.embed.external",
-    external: {
-      uri: canonicalUrl,
-      title: title.substring(0, 500), // Max 500 chars for title
-      description: (description || "").substring(0, 1000), // Max 1000 chars for description
-    },
-  };
+	// Build external embed
+	const embed: Record<string, unknown> = {
+		$type: "app.bsky.embed.external",
+		external: {
+			uri: canonicalUrl,
+			title: title.substring(0, 500), // Max 500 chars for title
+			description: (description || "").substring(0, 1000), // Max 1000 chars for description
+		},
+	};
 
-  // Add thumbnail if coverImage is available
-  if (coverImage) {
-    (embed.external as Record<string, unknown>).thumb = coverImage;
-  }
+	// Add thumbnail if coverImage is available
+	if (coverImage) {
+		(embed.external as Record<string, unknown>).thumb = coverImage;
+	}
 
-  // Create the post record
-  const record: Record<string, unknown> = {
-    $type: "app.bsky.feed.post",
-    text: postText,
-    facets,
-    embed,
-    createdAt: new Date(publishedAt).toISOString(),
-  };
+	// Create the post record
+	const record: Record<string, unknown> = {
+		$type: "app.bsky.feed.post",
+		text: postText,
+		facets,
+		embed,
+		createdAt: new Date(publishedAt).toISOString(),
+	};
 
-  const response = await agent.com.atproto.repo.createRecord({
-    repo: agent.session!.did,
-    collection: "app.bsky.feed.post",
-    record,
-  });
+	const response = await agent.com.atproto.repo.createRecord({
+		repo: agent.session!.did,
+		collection: "app.bsky.feed.post",
+		record,
+	});
 
-  return {
-    uri: response.data.uri,
-    cid: response.data.cid,
-  };
+	return {
+		uri: response.data.uri,
+		cid: response.data.cid,
+	};
 }
 
 /**
  * Add bskyPostRef to an existing document record
  */
 export async function addBskyPostRefToDocument(
-  agent: AtpAgent,
-  documentAtUri: string,
-  bskyPostRef: StrongRef
+	agent: AtpAgent,
+	documentAtUri: string,
+	bskyPostRef: StrongRef,
 ): Promise<void> {
-  const parsed = parseAtUri(documentAtUri);
-  if (!parsed) {
-    throw new Error(`Invalid document URI: ${documentAtUri}`);
-  }
+	const parsed = parseAtUri(documentAtUri);
+	if (!parsed) {
+		throw new Error(`Invalid document URI: ${documentAtUri}`);
+	}
 
-  // Fetch existing record
-  const existingRecord = await agent.com.atproto.repo.getRecord({
-    repo: parsed.did,
-    collection: parsed.collection,
-    rkey: parsed.rkey,
-  });
+	// Fetch existing record
+	const existingRecord = await agent.com.atproto.repo.getRecord({
+		repo: parsed.did,
+		collection: parsed.collection,
+		rkey: parsed.rkey,
+	});
 
-  // Add bskyPostRef to the record
-  const updatedRecord = {
-    ...(existingRecord.data.value as Record<string, unknown>),
-    bskyPostRef,
-  };
+	// Add bskyPostRef to the record
+	const updatedRecord = {
+		...(existingRecord.data.value as Record<string, unknown>),
+		bskyPostRef,
+	};
 
-  // Update the record
-  await agent.com.atproto.repo.putRecord({
-    repo: parsed.did,
-    collection: parsed.collection,
-    rkey: parsed.rkey,
-    record: updatedRecord,
-  });
+	// Update the record
+	await agent.com.atproto.repo.putRecord({
+		repo: parsed.did,
+		collection: parsed.collection,
+		rkey: parsed.rkey,
+		record: updatedRecord,
+	});
 }

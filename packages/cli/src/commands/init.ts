@@ -1,4 +1,4 @@
-import * as fs from "fs/promises";
+import * as fs from "node:fs/promises";
 import { command } from "cmd-ts";
 import {
 	intro,
@@ -11,7 +11,7 @@ import {
 	log,
 	group,
 } from "@clack/prompts";
-import * as path from "path";
+import * as path from "node:path";
 import { findConfig, generateConfigTemplate } from "../lib/config";
 import { loadCredentials } from "../lib/credentials";
 import { createAgent, createPublication } from "../lib/atproto";
