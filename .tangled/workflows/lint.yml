@@ -11,11 +11,12 @@ engine: "nixery"
 dependencies:
   nixpkgs:
     - bun
+    - biome
 
 steps:
   - name: "Install dependencies"
     command: "bun install"
   - name: "Lint check"
-    command: "cd packages/cli && bun x biome lint ."
+    command: "biome lint ./packages/cli"
   - name: "Format check"
-    command: "cd packages/cli && bun x biome format ."
+    command: "biome format ./packages/cli"
