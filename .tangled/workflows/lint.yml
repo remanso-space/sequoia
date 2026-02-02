@@ -1,0 +1,21 @@
+# Biome lint and format checks
+
+when:
+  - event: ["push", "manual"]
+    branch: ["main"]
+  - event: ["pull_request"]
+    branch: ["main"]
+
+engine: "nixery"
+
+dependencies:
+  nixpkgs:
+    - bun
+
+steps:
+  - name: "Install dependencies"
+    command: "bun install"
+  - name: "Lint check"
+    command: "cd packages/cli && bun x biome lint ."
+  - name: "Format check"
+    command: "cd packages/cli && bun x biome format ."
