@@ -186,11 +186,10 @@ export const publishCommand = command({
 					reason: "forced",
 				});
 			} else if (!postState) {
-				// New post
 				postsToPublish.push({
 					post,
-					action: "create",
-					reason: "new post",
+					action: post.frontmatter.atUri ? "update" : "create",
+					reason: post.frontmatter.atUri ? "missing state" : "new post",
 				});
 			} else if (postState.contentHash !== contentHash) {
 				// Changed post
