@@ -13,6 +13,7 @@ import { createAgent, listDocuments } from "../lib/atproto";
 import {
 	scanContentDirectory,
 	getContentHash,
+	getTextContent,
 	updateFrontmatterWithAtUri,
 	resolvePostPath,
 } from "../lib/markdown";
@@ -181,8 +182,22 @@ export const syncCommand = command({
 				log.message(`    URI: ${doc.uri}`);
 				log.message(`    File: ${path.basename(localPost.filePath)}`);
 
-				// Update state (use relative path from config directory)
-				const contentHash = await getContentHash(localPost.rawContent);
+				// Compare local text content with PDS text content to detect changes.
+				// We must avoid storing the local rawContent hash blindly, because
+				// that would make publish think nothing changed even when content
+				// was modified since the last publish.
+				const localTextContent = getTextContent(
+					localPost,
+					config.textContentField,
+				);
+				const contentMatchesPDS =
+					localTextContent.slice(0, 10000) === doc.value.textContent;
+
+				// If local content matches PDS, store the local hash (up to date).
+				// If it differs, store empty hash so publish detects the change.
+				const contentHash = contentMatchesPDS
+					? await getContentHash(localPost.rawContent)
+					: "";
 				const relativeFilePath = path.relative(configDir, localPost.filePath);
 				state.posts[relativeFilePath] = {
 					contentHash,
