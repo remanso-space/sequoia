@@ -21,7 +21,21 @@ export function parseFrontmatter(
 	const match = content.match(frontmatterRegex);
 
 	if (!match) {
-		throw new Error("Could not parse frontmatter");
+    const [, titleMatch] = content.trim().match(/^# (.+)$/m) || []
+    const title = titleMatch ?? ""
+    const [publishDate] = new Date().toISOString().split("T")
+
+    return {
+      frontmatter: {
+        title,
+        publishDate: publishDate ?? ""
+      },
+      body: content,
+      rawFrontmatter: {
+        title:
+        publishDate
+      }
+    }
 	}
 
 	const delimiter = match[1];
@@ -401,6 +415,11 @@ export function updateFrontmatterWithAtUri(
 
 	// Format the atUri entry based on frontmatter type
 	const atUriEntry = isToml ? `atUri = "${atUri}"` : `atUri: "${atUri}"`;
+
+	// No frontmatter: create one with atUri
+	if (!delimiterMatch) {
+		return `---\n${atUriEntry}\n---\n\n${rawContent}`;
+	}
 
 	// Check if atUri already exists in frontmatter (handle both formats)
 	if (rawContent.includes("atUri:") || rawContent.includes("atUri =")) {
