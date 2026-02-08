@@ -1,75 +1,258 @@
 import { Agent } from "@atproto/api"
-import {  BlogPost } from "../lib/types"
+import * as fs from "node:fs/promises"
+import * as path from "node:path"
+import mimeTypes from "mime-types"
+import { BlogPost, BlobObject } from "../lib/types"
 
 const LEXICON = "space.litenote.note"
 const MAX_CONTENT = 10000
+
+interface ImageRecord {
+  image: BlobObject
+  alt?: string
+}
+
+export interface NoteOptions {
+  contentDir: string
+  imagesDir?: string
+  allPosts: BlogPost[]
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function isLocalPath(url: string): boolean {
+  return (
+    !url.startsWith("http://") &&
+    !url.startsWith("https://") &&
+    !url.startsWith("#") &&
+    !url.startsWith("mailto:")
+  )
+}
+
+async function resolveLocalImagePath(
+  src: string,
+  postFilePath: string,
+  contentDir: string,
+  imagesDir?: string,
+): Promise<string | null> {
+  const candidates = [
+    path.resolve(path.dirname(postFilePath), src),
+    path.resolve(contentDir, src),
+  ]
+  if (imagesDir) {
+    candidates.push(path.resolve(imagesDir, src))
+    // Try stripping a leading directory that matches imagesDir basename
+    const baseName = path.basename(imagesDir)
+    const idx = src.indexOf(baseName)
+    if (idx !== -1) {
+      const after = src.substring(idx + baseName.length).replace(/^[/\\]/, "")
+      candidates.push(path.resolve(imagesDir, after))
+    }
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const stat = await fs.stat(candidate)
+      if (stat.isFile() && stat.size > 0) return candidate
+    } catch {}
+  }
+  return null
+}
+
+async function uploadBlob(
+  agent: Agent,
+  filePath: string,
+): Promise<BlobObject | undefined> {
+  if (!(await fileExists(filePath))) return undefined
+
+  try {
+    const imageBuffer = await fs.readFile(filePath)
+    const mimeType = mimeTypes.lookup(filePath) || "application/octet-stream"
+    const response = await agent.com.atproto.repo.uploadBlob(
+      new Uint8Array(imageBuffer),
+      { encoding: mimeType },
+    )
+    return {
+      $type: "blob",
+      ref: { $link: response.data.blob.ref.toString() },
+      mimeType,
+      size: imageBuffer.byteLength,
+    }
+  } catch (error) {
+    console.error(`Error uploading blob ${filePath}:`, error)
+    return undefined
+  }
+}
+
+async function processImages(
+  agent: Agent,
+  content: string,
+  postFilePath: string,
+  contentDir: string,
+  imagesDir?: string,
+): Promise<{ content: string; images: ImageRecord[] }> {
+  const images: ImageRecord[] = []
+  const uploadCache = new Map<string, BlobObject>()
+  let processedContent = content
+
+  const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g
+  const matches = [...content.matchAll(imageRegex)]
+
+  for (const match of matches) {
+    const fullMatch = match[0]
+    const alt = match[1] ?? ""
+    const src = match[2]!
+    if (!isLocalPath(src)) continue
+
+    const resolved = await resolveLocalImagePath(
+      src, postFilePath, contentDir, imagesDir,
+    )
+    if (!resolved) continue
+
+    let blob = uploadCache.get(resolved)
+    if (!blob) {
+      blob = await uploadBlob(agent, resolved)
+      if (!blob) continue
+      uploadCache.set(resolved, blob)
+    }
+
+    images.push({ image: blob, alt: alt || undefined })
+    processedContent = processedContent.replace(
+      fullMatch,
+      `![${alt}](${blob.ref.$link})`,
+    )
+  }
+
+  return { content: processedContent, images }
+}
+
+function removeUnpublishedLinks(
+  content: string,
+  allPosts: BlogPost[],
+): string {
+  const linkRegex = /(?<!!)\[([^\]]+)\]\(([^)]+)\)/g
+
+  return content.replace(linkRegex, (fullMatch, text, url) => {
+    if (!isLocalPath(url)) return fullMatch
+
+    // Normalize to a slug-like string for comparison
+    const normalized = url
+      .replace(/^\.?\/?/, "")
+      .replace(/\/?$/, "")
+      .replace(/\.mdx?$/, "")
+      .replace(/\/index$/, "")
+
+    const isPublished = allPosts.some((p) => {
+      if (!p.frontmatter.atUri) return false
+      return (
+        p.slug === normalized ||
+        p.slug.endsWith(`/${normalized}`) ||
+        normalized.endsWith(`/${p.slug}`)
+      )
+    })
+
+    if (!isPublished) return text
+    return fullMatch
+  })
+}
+
+async function processNoteContent(
+  agent: Agent,
+  post: BlogPost,
+  options: NoteOptions,
+): Promise<{ content: string; images: ImageRecord[] }> {
+  let content = post.content.trim()
+
+  content = removeUnpublishedLinks(content, options.allPosts)
+
+  const result = await processImages(
+    agent, content, post.filePath, options.contentDir, options.imagesDir,
+  )
+
+  return result
+}
+
+function parseRkey(atUri: string): string {
+  const uriMatch = atUri.match(/^at:\/\/([^/]+)\/([^/]+)\/(.+)$/)
+  if (!uriMatch) {
+    throw new Error(`Invalid atUri format: ${atUri}`)
+  }
+  return uriMatch[3]!
+}
 
 export async function createNote(
   agent: Agent,
   post: BlogPost,
   atUri: string,
+  options: NoteOptions,
 ): Promise<void> {
-  // Parse the atUri to get the site.standard.document rkey
-  // Format: at://did:plc:xxx/collection/rkey
-  const uriMatch = atUri.match(/^at:\/\/([^/]+)\/([^/]+)\/(.+)$/);
-  if (!uriMatch) {
-    throw new Error(`Invalid atUri format: ${atUri}`);
-  }
+  const rkey = parseRkey(atUri)
+  const publishDate = new Date(post.frontmatter.publishDate).toISOString()
+  const trimmedContent = post.content.trim()
+  const titleMatch = trimmedContent.match(/^# (.+)$/m)
+  const title = titleMatch ? titleMatch[1] : post.frontmatter.title
 
-  const [, , , rkey] = uriMatch;
-  const publishDate = new Date(post.frontmatter.publishDate).toISOString();
-  const trimmedContent = post.content.trim();
-  const titleMatch = trimmedContent.match(/^# (.+)$/m);
-  const title = titleMatch ? titleMatch[1] : post.frontmatter.title;
+  const { content, images } = await processNoteContent(agent, post, options)
 
   const record: Record<string, unknown> = {
     $type: LEXICON,
     title,
-    content: trimmedContent.slice(0, MAX_CONTENT),
+    content: content.slice(0, MAX_CONTENT),
     createdAt: publishDate,
     publishedAt: publishDate,
-  };
+  }
 
-  const response = await agent.com.atproto.repo.createRecord({
+  if (images.length > 0) {
+    record.images = images
+  }
+
+  await agent.com.atproto.repo.createRecord({
     repo: agent.did!,
     collection: LEXICON,
     record,
     rkey,
-    validate: false
-  });
+    validate: false,
+  })
 }
 
 export async function updateNote(
   agent: Agent,
   post: BlogPost,
   atUri: string,
+  options: NoteOptions,
 ): Promise<void> {
-  // Parse the atUri to get the rkey
-  // Format: at://did:plc:xxx/collection/rkey
-  const uriMatch = atUri.match(/^at:\/\/([^/]+)\/([^/]+)\/(.+)$/);
-  if (!uriMatch) {
-    throw new Error(`Invalid atUri format: ${atUri}`);
-  }
+  const rkey = parseRkey(atUri)
+  const publishDate = new Date(post.frontmatter.publishDate).toISOString()
+  const trimmedContent = post.content.trim()
+  const titleMatch = trimmedContent.match(/^# (.+)$/m)
+  const title = titleMatch ? titleMatch[1] : post.frontmatter.title
 
-  const [, , , rkey] = uriMatch;
-  const publishDate = new Date(post.frontmatter.publishDate).toISOString();
-  const trimmedContent = post.content.trim();
-  const titleMatch = trimmedContent.match(/^# (.+)$/m);
-  const title = titleMatch ? titleMatch[1] : post.frontmatter.title;
+  const { content, images } = await processNoteContent(agent, post, options)
 
   const record: Record<string, unknown> = {
     $type: LEXICON,
     title,
-    content: trimmedContent.slice(0, MAX_CONTENT),
+    content: content.slice(0, MAX_CONTENT),
     createdAt: publishDate,
     publishedAt: publishDate,
-  };
+  }
 
-  const response = await agent.com.atproto.repo.putRecord({
+  if (images.length > 0) {
+    record.images = images
+  }
+
+  await agent.com.atproto.repo.putRecord({
     repo: agent.did!,
     collection: LEXICON,
     rkey: rkey!,
     record,
-    validate: false
-  });
+    validate: false,
+  })
 }
