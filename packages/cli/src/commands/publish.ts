@@ -26,7 +26,7 @@ import {
 } from "../lib/markdown";
 import type { BlogPost, BlobObject, StrongRef } from "../lib/types";
 import { exitOnCancel } from "../lib/prompts";
-import { createNote, updateNote } from "./publish-lite"
+import { createNote, updateNote, type NoteOptions } from "./publish-lite"
 
 export const publishCommand = command({
 	name: "publish",
@@ -282,6 +282,12 @@ export const publishCommand = command({
 		let errorCount = 0;
 		let bskyPostCount = 0;
 
+		const context: NoteOptions = {
+			contentDir,
+			imagesDir,
+			allPosts: posts,
+		};
+
 		for (const { post, action } of postsToPublish) {
 			s.start(`Publishing: ${post.frontmatter.title}`);
 
@@ -317,7 +323,7 @@ export const publishCommand = command({
 
 				if (action === "create") {
 					atUri = await createDocument(agent, post, config, coverImage);
-          await createNote(agent, post, atUri)
+          await createNote(agent, post, atUri, context)
 					s.stop(`Created: ${atUri}`);
 
 					// Update frontmatter with atUri
@@ -334,7 +340,7 @@ export const publishCommand = command({
 				} else {
 					atUri = post.frontmatter.atUri!;
 					await updateDocument(agent, post, atUri, config, coverImage);
-          await updateNote(agent, post, atUri)
+          await updateNote(agent, post, atUri, context)
 					s.stop(`Updated: ${atUri}`);
 
 					// For updates, rawContent already has atUri
