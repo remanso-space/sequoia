@@ -1,17 +1,22 @@
 import { describe, expect, test } from "bun:test";
-import { resolveInternalLinks } from "./litenote";
+import { resolveInternalLinks, findPostsWithStaleLinks } from "./litenote";
 import type { BlogPost } from "../lib/types";
 
-function makePost(slug: string, atUri?: string): BlogPost {
+function makePost(
+	slug: string,
+	atUri?: string,
+	options?: { content?: string; draft?: boolean; filePath?: string },
+): BlogPost {
 	return {
-		filePath: `content/${slug}.md`,
+		filePath: options?.filePath ?? `content/${slug}.md`,
 		slug,
 		frontmatter: {
 			title: slug,
 			publishDate: "2024-01-01",
 			atUri,
+			draft: options?.draft,
 		},
-		content: "",
+		content: options?.content ?? "",
 		rawContent: "",
 		rawFrontmatter: {},
 	};
@@ -127,5 +132,107 @@ describe("resolveInternalLinks", () => {
 		expect(resolveInternalLinks(content, posts)).toBe(
 			"See [docs](at://did:plc:abc/space.litenote.note/docs1)",
 		);
+	});
+});
+
+describe("findPostsWithStaleLinks", () => {
+	test("finds published post containing link to a newly created slug", () => {
+		const posts = [
+			makePost("post-a", "at://did:plc:abc/site.standard.document/a1", {
+				content: "Check out [post B](./post-b)",
+			}),
+		];
+		const result = findPostsWithStaleLinks(posts, ["post-b"], new Set());
+		expect(result).toHaveLength(1);
+		expect(result[0]!.slug).toBe("post-a");
+	});
+
+	test("excludes posts in the exclude set (current batch)", () => {
+		const posts = [
+			makePost("post-a", "at://did:plc:abc/site.standard.document/a1", {
+				content: "Check out [post B](./post-b)",
+			}),
+		];
+		const result = findPostsWithStaleLinks(
+			posts,
+			["post-b"],
+			new Set(["content/post-a.md"]),
+		);
+		expect(result).toHaveLength(0);
+	});
+
+	test("excludes unpublished posts (no atUri)", () => {
+		const posts = [
+			makePost("post-a", undefined, {
+				content: "Check out [post B](./post-b)",
+			}),
+		];
+		const result = findPostsWithStaleLinks(posts, ["post-b"], new Set());
+		expect(result).toHaveLength(0);
+	});
+
+	test("excludes drafts", () => {
+		const posts = [
+			makePost("post-a", "at://did:plc:abc/site.standard.document/a1", {
+				content: "Check out [post B](./post-b)",
+				draft: true,
+			}),
+		];
+		const result = findPostsWithStaleLinks(posts, ["post-b"], new Set());
+		expect(result).toHaveLength(0);
+	});
+
+	test("ignores external links", () => {
+		const posts = [
+			makePost("post-a", "at://did:plc:abc/site.standard.document/a1", {
+				content: "Check out [post B](https://example.com/post-b)",
+			}),
+		];
+		const result = findPostsWithStaleLinks(posts, ["post-b"], new Set());
+		expect(result).toHaveLength(0);
+	});
+
+	test("ignores image embeds", () => {
+		const posts = [
+			makePost("post-a", "at://did:plc:abc/site.standard.document/a1", {
+				content: "![post B](./post-b)",
+			}),
+		];
+		const result = findPostsWithStaleLinks(posts, ["post-b"], new Set());
+		expect(result).toHaveLength(0);
+	});
+
+	test("ignores @mention links", () => {
+		const posts = [
+			makePost("post-a", "at://did:plc:abc/site.standard.document/a1", {
+				content: "@[post B](./post-b)",
+			}),
+		];
+		const result = findPostsWithStaleLinks(posts, ["post-b"], new Set());
+		expect(result).toHaveLength(0);
+	});
+
+	test("handles nested slug matching", () => {
+		const posts = [
+			makePost("post-a", "at://did:plc:abc/site.standard.document/a1", {
+				content: "Check out [post](my-post)",
+			}),
+		];
+		const result = findPostsWithStaleLinks(
+			posts,
+			["blog/my-post"],
+			new Set(),
+		);
+		expect(result).toHaveLength(1);
+	});
+
+	test("does not match posts without matching links", () => {
+		const posts = [
+			makePost("post-a", "at://did:plc:abc/site.standard.document/a1", {
+				content: "Check out [post C](./post-c)",
+			}),
+		];
+		const result = findPostsWithStaleLinks(posts, ["post-b"], new Set());
+		expect(result).toHaveLength(0);
 	});
 });

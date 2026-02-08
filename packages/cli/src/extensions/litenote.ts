@@ -27,7 +27,7 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-function isLocalPath(url: string): boolean {
+export function isLocalPath(url: string): boolean {
   return (
     !url.startsWith("http://") &&
     !url.startsWith("https://") &&
@@ -248,5 +248,38 @@ export async function updateNote(
     rkey: rkey!,
     record,
     validate: false,
+  })
+}
+
+export function findPostsWithStaleLinks(
+  allPosts: BlogPost[],
+  newSlugs: string[],
+  excludeFilePaths: Set<string>,
+): BlogPost[] {
+  const linkRegex = /(?<![!@])\[([^\]]+)\]\(([^)]+)\)/g
+
+  return allPosts.filter((post) => {
+    if (excludeFilePaths.has(post.filePath)) return false
+    if (!post.frontmatter.atUri) return false
+    if (post.frontmatter.draft) return false
+
+    const matches = [...post.content.matchAll(linkRegex)]
+    return matches.some((match) => {
+      const url = match[2]!
+      if (!isLocalPath(url)) return false
+
+      const normalized = url
+        .replace(/^\.?\/?/, "")
+        .replace(/\/?$/, "")
+        .replace(/\.mdx?$/, "")
+        .replace(/\/index$/, "")
+
+      return newSlugs.some(
+        (slug) =>
+          slug === normalized ||
+          slug.endsWith(`/${normalized}`) ||
+          normalized.endsWith(`/${slug}`),
+      )
+    })
   })
 }
