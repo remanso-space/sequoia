@@ -126,7 +126,7 @@ function removeUnpublishedLinks(
   content: string,
   allPosts: BlogPost[],
 ): string {
-  const linkRegex = /(?<!!)\[([^\]]+)\]\(([^)]+)\)/g
+  const linkRegex = /(?<![!@])\[([^\]]+)\]\(([^)]+)\)/g
 
   return content.replace(linkRegex, (fullMatch, text, url) => {
     if (!isLocalPath(url)) return fullMatch
