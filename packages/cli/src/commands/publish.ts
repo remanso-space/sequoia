@@ -26,7 +26,7 @@ import {
 } from "../lib/markdown";
 import type { BlogPost, BlobObject, StrongRef } from "../lib/types";
 import { exitOnCancel } from "../lib/prompts";
-import { createNote, updateNote, type NoteOptions } from "../extensions/litenote"
+import { createNote, updateNote, findPostsWithStaleLinks, type NoteOptions } from "../extensions/litenote"
 
 export const publishCommand = command({
 	name: "publish",
@@ -288,6 +288,13 @@ export const publishCommand = command({
 			allPosts: posts,
 		};
 
+		// Pass 1: Create/update document records and collect note queue
+		const noteQueue: Array<{
+			post: BlogPost;
+			action: "create" | "update";
+			atUri: string;
+		}> = [];
+
 		for (const { post, action } of postsToPublish) {
 			s.start(`Publishing: ${post.frontmatter.title}`);
 
@@ -323,7 +330,7 @@ export const publishCommand = command({
 
 				if (action === "create") {
 					atUri = await createDocument(agent, post, config, coverImage);
-          await createNote(agent, post, atUri, context)
+					post.frontmatter.atUri = atUri;
 					s.stop(`Created: ${atUri}`);
 
 					// Update frontmatter with atUri
@@ -340,7 +347,6 @@ export const publishCommand = command({
 				} else {
 					atUri = post.frontmatter.atUri!;
 					await updateDocument(agent, post, atUri, config, coverImage);
-          await updateNote(agent, post, atUri, context)
 					s.stop(`Updated: ${atUri}`);
 
 					// For updates, rawContent already has atUri
@@ -398,12 +404,61 @@ export const publishCommand = command({
 					slug: post.slug,
 					bskyPostRef,
 				};
+
+				noteQueue.push({ post, action, atUri });
 			} catch (error) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);
 				s.stop(`Error publishing "${path.basename(post.filePath)}"`);
 				log.error(`  ${errorMessage}`);
 				errorCount++;
+			}
+		}
+
+		// Pass 2: Create/update litenote notes (atUris are now available for link resolution)
+		for (const { post, action, atUri } of noteQueue) {
+			try {
+				if (action === "create") {
+					await createNote(agent, post, atUri, context);
+				} else {
+					await updateNote(agent, post, atUri, context);
+				}
+			} catch (error) {
+				log.warn(
+					`Failed to create note for "${post.frontmatter.title}": ${error instanceof Error ? error.message : String(error)}`,
+				);
+			}
+		}
+
+		// Re-process already-published posts with stale links to newly created posts
+		const newlyCreatedSlugs = noteQueue
+			.filter((r) => r.action === "create")
+			.map((r) => r.post.slug);
+
+		if (newlyCreatedSlugs.length > 0) {
+			const batchFilePaths = new Set(noteQueue.map((r) => r.post.filePath));
+			const stalePosts = findPostsWithStaleLinks(
+				posts,
+				newlyCreatedSlugs,
+				batchFilePaths,
+			);
+
+			for (const stalePost of stalePosts) {
+				try {
+					s.start(`Updating links in: ${stalePost.frontmatter.title}`);
+					await updateNote(
+						agent,
+						stalePost,
+						stalePost.frontmatter.atUri!,
+						context,
+					);
+					s.stop(`Updated links: ${stalePost.frontmatter.title}`);
+				} catch (error) {
+					s.stop(`Failed to update links: ${stalePost.frontmatter.title}`);
+					log.warn(
+						`  ${error instanceof Error ? error.message : String(error)}`,
+					);
+				}
 			}
 		}
 
