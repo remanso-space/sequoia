@@ -18,15 +18,17 @@ export async function createNote(
 
   const [, , , rkey] = uriMatch;
   const publishDate = new Date(post.frontmatter.publishDate).toISOString();
+  const trimmedContent = post.content.trim();
+  const titleMatch = trimmedContent.match(/^# (.+)$/m);
+  const title = titleMatch ? titleMatch[1] : post.frontmatter.title;
 
   const record: Record<string, unknown> = {
     $type: LEXICON,
-    title: post.frontmatter.title,
-    content: post.content.slice(0, MAX_CONTENT),
+    title,
+    content: trimmedContent.slice(0, MAX_CONTENT),
     createdAt: publishDate,
     publishedAt: publishDate,
   };
-
 
   const response = await agent.com.atproto.repo.createRecord({
     repo: agent.did!,
@@ -52,13 +54,15 @@ export async function updateNote(
   }
 
   const [, , , rkey] = uriMatch;
-
   const publishDate = new Date(post.frontmatter.publishDate).toISOString();
+  const trimmedContent = post.content.trim();
+  const titleMatch = trimmedContent.match(/^# (.+)$/m);
+  const title = titleMatch ? titleMatch[1] : post.frontmatter.title;
 
   const record: Record<string, unknown> = {
     $type: LEXICON,
-    title: post.frontmatter.title,
-    content: post.content.slice(0, MAX_CONTENT),
+    title,
+    content: trimmedContent.slice(0, MAX_CONTENT),
     createdAt: publishDate,
     publishedAt: publishDate,
   };
