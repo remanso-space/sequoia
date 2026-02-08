@@ -37,8 +37,6 @@ export async function createNote(
     rkey,
     validate: false
   });
-
-  console.log("\n\n create -", response);
 }
 
 export async function updateNote(
@@ -74,6 +72,4 @@ export async function updateNote(
     record,
     validate: false
   });
-
-  console.log("\n\n update -", response);
 }
