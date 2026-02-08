@@ -36,19 +36,18 @@ function isLocalPath(url: string): boolean {
   )
 }
 
-async function resolveLocalImagePath(
+function getImageCandidates(
   src: string,
   postFilePath: string,
   contentDir: string,
   imagesDir?: string,
-): Promise<string | null> {
+): string[] {
   const candidates = [
     path.resolve(path.dirname(postFilePath), src),
     path.resolve(contentDir, src),
   ]
   if (imagesDir) {
     candidates.push(path.resolve(imagesDir, src))
-    // Try stripping a leading directory that matches imagesDir basename
     const baseName = path.basename(imagesDir)
     const idx = src.indexOf(baseName)
     if (idx !== -1) {
@@ -56,39 +55,33 @@ async function resolveLocalImagePath(
       candidates.push(path.resolve(imagesDir, after))
     }
   }
-
-  for (const candidate of candidates) {
-    try {
-      const stat = await fs.stat(candidate)
-      if (stat.isFile() && stat.size > 0) return candidate
-    } catch {}
-  }
-  return null
+  return candidates
 }
 
 async function uploadBlob(
   agent: Agent,
-  filePath: string,
+  candidates: string[],
 ): Promise<BlobObject | undefined> {
-  if (!(await fileExists(filePath))) return undefined
+  for (const filePath of candidates) {
+    if (!(await fileExists(filePath))) continue
 
-  try {
-    const imageBuffer = await fs.readFile(filePath)
-    const mimeType = mimeTypes.lookup(filePath) || "application/octet-stream"
-    const response = await agent.com.atproto.repo.uploadBlob(
-      new Uint8Array(imageBuffer),
-      { encoding: mimeType },
-    )
-    return {
-      $type: "blob",
-      ref: { $link: response.data.blob.ref.toString() },
-      mimeType,
-      size: imageBuffer.byteLength,
-    }
-  } catch (error) {
-    console.error(`Error uploading blob ${filePath}:`, error)
-    return undefined
+    try {
+      const imageBuffer = await fs.readFile(filePath)
+      if (imageBuffer.byteLength === 0) continue
+      const mimeType = mimeTypes.lookup(filePath) || "application/octet-stream"
+      const response = await agent.com.atproto.repo.uploadBlob(
+        new Uint8Array(imageBuffer),
+        { encoding: mimeType },
+      )
+      return {
+        $type: "blob",
+        ref: { $link: response.data.blob.ref.toString() },
+        mimeType,
+        size: imageBuffer.byteLength,
+      }
+    } catch {}
   }
+  return undefined
 }
 
 async function processImages(
@@ -111,16 +104,12 @@ async function processImages(
     const src = match[2]!
     if (!isLocalPath(src)) continue
 
-    const resolved = await resolveLocalImagePath(
-      src, postFilePath, contentDir, imagesDir,
-    )
-    if (!resolved) continue
-
-    let blob = uploadCache.get(resolved)
+    let blob = uploadCache.get(src)
     if (!blob) {
-      blob = await uploadBlob(agent, resolved)
+      const candidates = getImageCandidates(src, postFilePath, contentDir, imagesDir)
+      blob = await uploadBlob(agent, candidates)
       if (!blob) continue
-      uploadCache.set(resolved, blob)
+      uploadCache.set(src, blob)
     }
 
     images.push({ image: blob, alt: alt || undefined })
