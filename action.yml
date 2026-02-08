@@ -1,0 +1,93 @@
+name: 'Sequoia Publish'
+description: 'Publish your markdown content to ATProtocol using Sequoia CLI'
+branding:
+  icon: 'upload-cloud'
+  color: 'green'
+
+inputs:
+  identifier:
+    description: 'ATProto handle or DID (e.g. yourname.bsky.social)'
+    required: true
+  app-password:
+    description: 'ATProto app password'
+    required: true
+  pds-url:
+    description: 'PDS URL (defaults to https://bsky.social)'
+    required: false
+    default: 'https://bsky.social'
+  force:
+    description: 'Force publish all posts, ignoring change detection'
+    required: false
+    default: 'false'
+  commit-back:
+    description: 'Commit updated frontmatter and state file back to the repo'
+    required: false
+    default: 'true'
+  working-directory:
+    description: 'Directory containing sequoia.json (defaults to repo root)'
+    required: false
+    default: '.'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Checkout Sequoia CLI
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.action_repository }}
+        ref: ${{ github.action_ref }}
+        path: .sequoia-action
+
+    - name: Build and install Sequoia CLI
+      shell: bash
+      run: |
+        cd .sequoia-action
+        bun install
+        bun run build:cli
+        bun link --cwd packages/cli
+
+    - name: Sync state from ATProtocol
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ATP_IDENTIFIER: ${{ inputs.identifier }}
+        ATP_APP_PASSWORD: ${{ inputs.app-password }}
+        PDS_URL: ${{ inputs.pds-url }}
+      run: sequoia sync
+
+    - name: Publish
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ATP_IDENTIFIER: ${{ inputs.identifier }}
+        ATP_APP_PASSWORD: ${{ inputs.app-password }}
+        PDS_URL: ${{ inputs.pds-url }}
+      run: |
+        FLAGS=""
+        if [ "${{ inputs.force }}" = "true" ]; then
+          FLAGS="--force"
+        fi
+        sequoia publish $FLAGS
+
+    - name: Clean up action checkout
+      shell: bash
+      run: rm -rf .sequoia-action
+
+    - name: Commit back changes
+      if: inputs.commit-back == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add -A .sequoia-state.json
+        git add -A *.md **/*.md || true
+        if git diff --cached --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "chore: update sequoia state [skip ci]"
+          git push
+        fi
