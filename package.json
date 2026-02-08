@@ -13,7 +13,8 @@
 		"build:docs": "cd docs && bun run build",
 		"build:cli": "cd packages/cli && bun run build",
 		"deploy:docs": "cd docs && bun run deploy",
-		"deploy:cli": "cd packages/cli && bun run deploy"
+		"deploy:cli": "cd packages/cli && bun run deploy",
+    "test:cli": "cd packages/cli && bun test"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
