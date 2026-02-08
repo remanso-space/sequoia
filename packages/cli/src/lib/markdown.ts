@@ -1,3 +1,4 @@
+import { webcrypto as crypto } from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { glob } from "glob";
