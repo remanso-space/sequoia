@@ -373,3 +373,13 @@ export function stripMarkdownForText(markdown: string): string {
 		.replace(/\n{3,}/g, "\n\n") // Normalize multiple newlines
 		.trim();
 }
+
+export function getTextContent(
+	post: { content: string; rawFrontmatter?: Record<string, unknown> },
+	textContentField?: string,
+): string {
+	if (textContentField && post.rawFrontmatter?.[textContentField]) {
+		return String(post.rawFrontmatter[textContentField]);
+	}
+	return stripMarkdownForText(post.content);
+}
