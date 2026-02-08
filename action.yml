@@ -34,17 +34,10 @@ runs:
     - name: Setup Bun
       uses: oven-sh/setup-bun@v2
 
-    - name: Checkout Sequoia CLI
-      uses: actions/checkout@v4
-      with:
-        repository: ${{ github.action_repository }}
-        ref: ${{ github.action_ref }}
-        path: .sequoia-action
-
     - name: Build and install Sequoia CLI
       shell: bash
       run: |
-        cd .sequoia-action
+        cd ${{ github.action_path }}
         bun install
         bun run build:cli
         bun link --cwd packages/cli
@@ -71,10 +64,6 @@ runs:
           FLAGS="--force"
         fi
         sequoia publish $FLAGS
-
-    - name: Clean up action checkout
-      shell: bash
-      run: rm -rf .sequoia-action
 
     - name: Commit back changes
       if: inputs.commit-back == 'true'
