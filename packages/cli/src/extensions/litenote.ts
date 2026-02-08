@@ -122,7 +122,7 @@ async function processImages(
   return { content: processedContent, images }
 }
 
-function removeUnpublishedLinks(
+export function resolveInternalLinks(
   content: string,
   allPosts: BlogPost[],
 ): string {
@@ -138,7 +138,7 @@ function removeUnpublishedLinks(
       .replace(/\.mdx?$/, "")
       .replace(/\/index$/, "")
 
-    const isPublished = allPosts.some((p) => {
+    const matchedPost = allPosts.find((p) => {
       if (!p.frontmatter.atUri) return false
       return (
         p.slug === normalized ||
@@ -147,8 +147,13 @@ function removeUnpublishedLinks(
       )
     })
 
-    if (!isPublished) return text
-    return fullMatch
+    if (!matchedPost) return text
+
+    const noteUri = matchedPost.frontmatter.atUri!.replace(
+      /\/[^/]+\/([^/]+)$/,
+      `/space.litenote.note/$1`,
+    )
+    return `[${text}](${noteUri})`
   })
 }
 
@@ -159,7 +164,7 @@ async function processNoteContent(
 ): Promise<{ content: string; images: ImageRecord[] }> {
   let content = post.content.trim()
 
-  content = removeUnpublishedLinks(content, options.allPosts)
+  content = resolveInternalLinks(content, options.allPosts)
 
   const result = await processImages(
     agent, content, post.filePath, options.contentDir, options.imagesDir,
