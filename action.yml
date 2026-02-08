@@ -81,8 +81,8 @@ runs:
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config user.name "$(git log -1 --format='%an')"
+        git config user.email "$(git log -1 --format='%ae')"
         git add -A *.md **/*.md || true
         if git diff --cached --quiet; then
           echo "No changes to commit"
