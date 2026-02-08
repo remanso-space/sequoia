@@ -26,7 +26,7 @@ import {
 } from "../lib/markdown";
 import type { BlogPost, BlobObject, StrongRef } from "../lib/types";
 import { exitOnCancel } from "../lib/prompts";
-import { createNote, updateNote, type NoteOptions } from "./publish-lite"
+import { createNote, updateNote, type NoteOptions } from "../extensions/litenote"
 
 export const publishCommand = command({
 	name: "publish",
