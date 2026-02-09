@@ -72,7 +72,7 @@ runs:
       run: |
         git config user.name "$(git log -1 --format='%an')"
         git config user.email "$(git log -1 --format='%ae')"
-        git add -A *.md **/*.md || true
+        git add -A -- '**/*.md' || true
         if git diff --cached --quiet; then
           echo "No changes to commit"
         else
