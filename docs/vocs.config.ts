@@ -18,7 +18,6 @@ export default defineConfig({
 		{ text: "Docs", link: "/quickstart", match: "/" },
 		{ text: "Blog", link: "/blog" },
 		{ text: "Tangled", link: "https://tangled.org/stevedylan.dev/sequoia" },
-		{ text: "GitHub", link: "https://github.com/stevedylandev/sequoia" },
 	],
 	sidebar: [
 		{

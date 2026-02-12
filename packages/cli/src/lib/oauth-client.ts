@@ -59,7 +59,7 @@ export async function getOAuthClient(): Promise<NodeOAuthClient> {
 		clientMetadata: {
 			client_id: `http://localhost?${clientIdParams.toString()}`,
 			client_name: "Sequoia CLI",
-			client_uri: "https://github.com/stevedylandev/sequoia",
+			client_uri: "https://sequoia.pub",
 			redirect_uris: [CALLBACK_URL],
 			grant_types: ["authorization_code", "refresh_token"],
 			response_types: ["code"],

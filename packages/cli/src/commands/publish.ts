@@ -44,7 +44,7 @@ export const publishCommand = command({
 			long: "verbose",
 			short: "v",
 			description: "Show more information",
-		})
+		}),
 	},
 	handler: async ({ force, dryRun, verbose }) => {
 		// Load config
@@ -240,9 +240,12 @@ export const publishCommand = command({
 
 			let postUrl = "";
 			if (verbose) {
-				postUrl = `\n    ${config.siteUrl}/${relativeFilePath}`;
+				const pathPrefix = config.pathPrefix || "/posts";
+				postUrl = `\n ${config.siteUrl}${pathPrefix}/${post.slug}`;
 			}
-			log.message(`  ${icon} ${post.frontmatter.title} (${reason})${bskyNote}${postUrl}`);
+			log.message(
+				`  ${icon} ${post.frontmatter.title} (${reason})${bskyNote}${postUrl}`,
+			);
 		}
 
 		if (dryRun) {
