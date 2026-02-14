@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { resolveInternalLinks, findPostsWithStaleLinks } from "./litenote";
+import { resolveInternalLinks, findPostsWithStaleLinks } from "./remanso";
 import type { BlogPost } from "../lib/types";
 
 function makePost(
@@ -29,7 +29,7 @@ describe("resolveInternalLinks", () => {
 		expect(resolveInternalLinks(content, posts)).toBe("See my post");
 	});
 
-	test("rewrites published link to litenote atUri", () => {
+	test("rewrites published link to remanso atUri", () => {
 		const posts = [
 			makePost(
 				"other-post",
@@ -38,7 +38,7 @@ describe("resolveInternalLinks", () => {
 		];
 		const content = "See [my post](./other-post)";
 		expect(resolveInternalLinks(content, posts)).toBe(
-			"See [my post](at://did:plc:abc/space.litenote.note/abc123)",
+			"See [my post](at://did:plc:abc/space.remanso.note/abc123)",
 		);
 	});
 
@@ -67,7 +67,7 @@ describe("resolveInternalLinks", () => {
 		];
 		const content = "Read the [guide](guide.md)";
 		expect(resolveInternalLinks(content, posts)).toBe(
-			"Read the [guide](at://did:plc:abc/space.litenote.note/guide123)",
+			"Read the [guide](at://did:plc:abc/space.remanso.note/guide123)",
 		);
 	});
 
@@ -80,7 +80,7 @@ describe("resolveInternalLinks", () => {
 		];
 		const content = "See [post](my-post)";
 		expect(resolveInternalLinks(content, posts)).toBe(
-			"See [post](at://did:plc:abc/space.litenote.note/rkey1)",
+			"See [post](at://did:plc:abc/space.remanso.note/rkey1)",
 		);
 	});
 
@@ -117,7 +117,7 @@ describe("resolveInternalLinks", () => {
 		const content =
 			"See [a](published) and [b](unpublished) and [c](https://ext.com)";
 		expect(resolveInternalLinks(content, posts)).toBe(
-			"See [a](at://did:plc:abc/space.litenote.note/pub1) and b and [c](https://ext.com)",
+			"See [a](at://did:plc:abc/space.remanso.note/pub1) and b and [c](https://ext.com)",
 		);
 	});
 
@@ -130,7 +130,7 @@ describe("resolveInternalLinks", () => {
 		];
 		const content = "See [docs](./docs/index)";
 		expect(resolveInternalLinks(content, posts)).toBe(
-			"See [docs](at://did:plc:abc/space.litenote.note/docs1)",
+			"See [docs](at://did:plc:abc/space.remanso.note/docs1)",
 		);
 	});
 });

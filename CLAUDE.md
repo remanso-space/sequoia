@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Sequoia is a CLI tool for publishing Markdown documents with frontmatter to the AT Protocol (Bluesky's decentralized social network). It converts blog posts into ATProto records (`site.standard.document`, `space.litenote.note`) and publishes them to a user's PDS.
+Sequoia is a CLI tool for publishing Markdown documents with frontmatter to the AT Protocol (Bluesky's decentralized social network). It converts blog posts into ATProto records (`site.standard.document`, `space.remanso.note`) and publishes them to a user's PDS.
 
 Website: <https://sequoia.pub>
 
@@ -63,7 +63,7 @@ bun run dev:docs
 
 **Extensions** (`src/extensions/`):
 
-- `litenote.ts` — Creates `space.litenote.note` records with embedded images
+- `remanso.ts` — Creates `space.remanso.note` records with embedded images
 
 ## Key Patterns
 

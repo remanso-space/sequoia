@@ -4,7 +4,7 @@ import * as path from "node:path"
 import mimeTypes from "mime-types"
 import { BlogPost, BlobObject } from "../lib/types"
 
-const LEXICON = "space.litenote.note"
+const LEXICON = "space.remanso.note"
 const MAX_CONTENT = 10000
 
 interface ImageRecord {
@@ -151,7 +151,7 @@ export function resolveInternalLinks(
 
     const noteUri = matchedPost.frontmatter.atUri!.replace(
       /\/[^/]+\/([^/]+)$/,
-      `/space.litenote.note/$1`,
+      `/space.remanso.note/$1`,
     )
     return `[${text}](${noteUri})`
   })
