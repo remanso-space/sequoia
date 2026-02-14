@@ -295,7 +295,10 @@ export const publishCommand = command({
 		}> = [];
 
 		for (const { post, action } of postsToPublish) {
-			s.start(`Publishing: ${post.frontmatter.title}`);
+      const trimmedContent = post.content.trim()
+      const titleMatch = trimmedContent.match(/^# (.+)$/m)
+      const title = titleMatch ? titleMatch[1] : post.frontmatter.title
+      s.start(`Publishing: ${title}`);
 
       // Init publish date
       if (!post.frontmatter.publishDate) {
