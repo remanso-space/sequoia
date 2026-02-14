@@ -94,6 +94,11 @@ export function parseFrontmatter(
 	const coverField = mapping?.coverImage || "ogImage";
 	frontmatter.ogImage = raw[coverField] || raw.ogImage;
 
+	// Theme, font family and font size
+	frontmatter.theme = raw.theme;
+	frontmatter.fontFamily = raw.fontFamily;
+	frontmatter.fontSize = raw.fontSize;
+
 	// Tags mapping
 	const tagsField = mapping?.tags || "tags";
 	frontmatter.tags = raw[tagsField] || raw.tags;
