@@ -242,6 +242,18 @@ export async function updateNote(
     record.images = images
   }
 
+  if (post.frontmatter.theme) {
+    record.theme = post.frontmatter.theme
+  }
+
+  if (post.frontmatter.fontSize) {
+    record.fontSize = post.frontmatter.fontSize
+  }  
+
+  if (post.frontmatter.fontFamily) {
+    record.fontFamily = post.frontmatter.fontFamily
+  }
+
   await agent.com.atproto.repo.putRecord({
     repo: agent.did!,
     collection: LEXICON,
