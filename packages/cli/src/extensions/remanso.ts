@@ -1,8 +1,8 @@
-import { Agent } from "@atproto/api"
+import type { Agent } from "@atproto/api"
 import * as fs from "node:fs/promises"
 import * as path from "node:path"
 import mimeTypes from "mime-types"
-import { BlogPost, BlobObject } from "../lib/types"
+import type { BlogPost, BlobObject } from "../lib/types"
 
 const LEXICON = "space.remanso.note"
 const MAX_CONTENT = 10000
