@@ -229,6 +229,9 @@ export const syncCommand = command({
 			log.warn(
 				`Unmatched: ${unmatchedCount} documents (exist on PDS but not locally)`,
 			);
+			log.info(
+				`Run 'sequoia publish' to delete unmatched records from your PDS.`,
+			);
 		}
 
 		if (dryRun) {

@@ -18,6 +18,7 @@ import {
 	createBlueskyPost,
 	addBskyPostRefToDocument,
 	deleteRecord,
+	listDocuments,
 } from "../lib/atproto";
 import {
 	scanContentDirectory,
@@ -173,17 +174,19 @@ export const publishCommand = command({
 			posts.map((p) => path.relative(configDir, p.filePath)),
 		);
 		const deletedEntries: Array<{ filePath: string; atUri: string }> = [];
+
 		for (const [filePath, postState] of Object.entries(state.posts)) {
 			if (!scannedPaths.has(filePath) && postState.atUri) {
 				// Check if the file truly doesn't exist (not just excluded by ignore patterns)
 				const absolutePath = path.resolve(configDir, filePath);
-
-				// If file exists but wasn't scanned (e.g. draft or ignored) — skip
 				if (!(await fileExists(absolutePath))) {
 					deletedEntries.push({ filePath, atUri: postState.atUri });
 				}
 			}
 		}
+
+		// Detect unmatched PDS records: exist on PDS but have no matching local file
+		const unmatchedEntries: Array<{ atUri: string; title: string }> = [];
 
 		// Shared agent — created lazily, reused across deletion and publishing
 		let agent: Awaited<ReturnType<typeof createAgent>> | undefined;
@@ -257,12 +260,37 @@ export const publishCommand = command({
 			);
 		}
 
-		if (postsToPublish.length === 0) {
-			log.success("All posts are up to date. Nothing to publish.");
-			return;
+		// Fetch PDS records and detect unmatched documents
+		async function fetchUnmatchedRecords() {
+			const ag = await getAgent();
+			s.start("Fetching documents from PDS...");
+			const pdsDocuments = await listDocuments(ag, config.publicationUri);
+			s.stop(`Found ${pdsDocuments.length} documents on PDS`);
+
+			const pathPrefix = config.pathPrefix || "/posts";
+			const postsByPath = new Map<string, BlogPost>();
+			for (const post of posts) {
+				postsByPath.set(`${pathPrefix}/${post.slug}`, post);
+			}
+			const deletedAtUris = new Set(deletedEntries.map((e) => e.atUri));
+			for (const doc of pdsDocuments) {
+				if (!postsByPath.has(doc.value.path) && !deletedAtUris.has(doc.uri)) {
+					unmatchedEntries.push({
+						atUri: doc.uri,
+						title: doc.value.title || doc.value.path,
+					});
+				}
+			}
 		}
 
-		log.info(`\n${postsToPublish.length} posts to publish:\n`);
+		if (postsToPublish.length === 0 && deletedEntries.length === 0) {
+			await fetchUnmatchedRecords();
+
+			if (unmatchedEntries.length === 0) {
+				log.success("All posts are up to date. Nothing to publish.");
+				return;
+			}
+		}
 
 		// Bluesky posting configuration
 		const blueskyEnabled = config.bluesky?.enabled ?? false;
@@ -270,37 +298,59 @@ export const publishCommand = command({
 		const cutoffDate = new Date();
 		cutoffDate.setDate(cutoffDate.getDate() - maxAgeDays);
 
-		for (const { post, action, reason } of postsToPublish) {
-			const icon = action === "create" ? "+" : "~";
-			const relativeFilePath = path.relative(configDir, post.filePath);
-			const existingBskyPostRef = state.posts[relativeFilePath]?.bskyPostRef;
+		if (postsToPublish.length > 0) {
+			log.info(`\n${postsToPublish.length} posts to publish:\n`);
 
-			let bskyNote = "";
-			if (blueskyEnabled) {
-				if (existingBskyPostRef) {
-					bskyNote = " [bsky: exists]";
-				} else {
-					const publishDate = new Date(post.frontmatter.publishDate);
-					if (publishDate < cutoffDate) {
-						bskyNote = ` [bsky: skipped, older than ${maxAgeDays} days]`;
+			for (const { post, action, reason } of postsToPublish) {
+				const icon = action === "create" ? "+" : "~";
+				const relativeFilePath = path.relative(configDir, post.filePath);
+				const existingBskyPostRef = state.posts[relativeFilePath]?.bskyPostRef;
+
+				let bskyNote = "";
+				if (blueskyEnabled) {
+					if (existingBskyPostRef) {
+						bskyNote = " [bsky: exists]";
 					} else {
-						bskyNote = " [bsky: will post]";
+						const publishDate = new Date(post.frontmatter.publishDate);
+						if (publishDate < cutoffDate) {
+							bskyNote = ` [bsky: skipped, older than ${maxAgeDays} days]`;
+						} else {
+							bskyNote = " [bsky: will post]";
+						}
 					}
 				}
-			}
 
-			let postUrl = "";
-			if (verbose) {
-				const postPath = resolvePostPath(
-					post,
-					config.pathPrefix,
-					config.pathTemplate,
+				let postUrl = "";
+				if (verbose) {
+					const postPath = resolvePostPath(
+						post,
+						config.pathPrefix,
+						config.pathTemplate,
+					);
+					postUrl = `\n ${config.siteUrl}${postPath}`;
+				}
+				log.message(
+					`  ${icon} ${post.filePath} (${reason})${bskyNote}${postUrl}`,
 				);
-				postUrl = `\n ${config.siteUrl}${postPath}`;
 			}
-			log.message(
-				`  ${icon} ${post.filePath} (${reason})${bskyNote}${postUrl}`,
+		}
+
+		if (deletedEntries.length > 0) {
+			log.info(
+				`\n${deletedEntries.length} deleted local files to remove from PDS:\n`,
 			);
+			for (const { filePath } of deletedEntries) {
+				log.message(`  - ${filePath}`);
+			}
+		}
+
+		if (unmatchedEntries.length > 0) {
+			log.info(
+				`\n${unmatchedEntries.length} unmatched PDS records to delete:\n`,
+			);
+			for (const { title } of unmatchedEntries) {
+				log.message(`  - ${title}`);
+			}
 		}
 
 		if (dryRun) {
@@ -316,6 +366,11 @@ export const publishCommand = command({
 
 		if (!agent) {
 			throw new Error("agent is not connected");
+		}
+
+		// Fetch PDS records to detect unmatched documents (if not already done)
+		if (unmatchedEntries.length === 0) {
+			await fetchUnmatchedRecords();
 		}
 
 		// Publish posts
@@ -512,13 +567,69 @@ export const publishCommand = command({
 			}
 		}
 
+		// Delete records for removed files
+		let deletedCount = 0;
+		for (const { filePath, atUri } of deletedEntries) {
+			try {
+				const ag = await getAgent();
+				s.start(`Deleting: ${filePath}`);
+				await deleteRecord(ag, atUri);
+
+				// Try to delete the corresponding Remanso note
+				try {
+					const noteAtUri = atUri.replace(
+						"site.standard.document",
+						"space.remanso.note",
+					);
+					await deleteNote(ag, noteAtUri);
+				} catch {
+					// Note may not exist, ignore
+				}
+
+				delete state.posts[filePath];
+				s.stop(`Deleted: ${filePath}`);
+				deletedCount++;
+			} catch (error) {
+				s.stop(`Failed to delete: ${filePath}`);
+				log.warn(`  ${error instanceof Error ? error.message : String(error)}`);
+			}
+		}
+
+		// Delete unmatched PDS records (exist on PDS but no matching local file)
+		let unmatchedDeletedCount = 0;
+		for (const { atUri, title } of unmatchedEntries) {
+			try {
+				const ag = await getAgent();
+				s.start(`Deleting unmatched: ${title}`);
+				await deleteRecord(ag, atUri);
+
+				// Try to delete the corresponding Remanso note
+				try {
+					const noteAtUri = atUri.replace(
+						"site.standard.document",
+						"space.remanso.note",
+					);
+					await deleteNote(ag, noteAtUri);
+				} catch {
+					// Note may not exist, ignore
+				}
+
+				s.stop(`Deleted unmatched: ${title}`);
+				unmatchedDeletedCount++;
+			} catch (error) {
+				s.stop(`Failed to delete: ${title}`);
+				log.warn(`  ${error instanceof Error ? error.message : String(error)}`);
+			}
+		}
+
 		// Save state
 		await saveState(configDir, state);
 
 		// Summary
 		log.message("\n---");
-		if (deletedEntries.length > 0) {
-			log.info(`Deleted: ${deletedEntries.length}`);
+		const totalDeleted = deletedCount + unmatchedDeletedCount;
+		if (totalDeleted > 0) {
+			log.info(`Deleted: ${totalDeleted}`);
 		}
 		log.info(`Published: ${publishedCount}`);
 		log.info(`Updated: ${updatedCount}`);
