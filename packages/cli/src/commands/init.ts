@@ -17,15 +17,7 @@ import { loadCredentials, listAllCredentials } from "../lib/credentials";
 import { createAgent, createPublication } from "../lib/atproto";
 import { selectCredential } from "../lib/credential-select";
 import type { FrontmatterMapping, BlueskyConfig } from "../lib/types";
-
-async function fileExists(filePath: string): Promise<boolean> {
-	try {
-		await fs.access(filePath);
-		return true;
-	} catch {
-		return false;
-	}
-}
+import { fileExists } from "../lib/utils";
 
 const onCancel = () => {
 	outro("Setup cancelled");

@@ -239,7 +239,11 @@ describe("getSlugFromOptions", () => {
 	});
 
 	test("falls back to filepath when slugField not found in frontmatter", () => {
-		const slug = getSlugFromOptions("blog/my-post.md", {}, { slugField: "slug" });
+		const slug = getSlugFromOptions(
+			"blog/my-post.md",
+			{},
+			{ slugField: "slug" },
+		);
 		expect(slug).toBe("blog/my-post");
 	});
 
@@ -320,7 +324,10 @@ title: My Post
 ---
 Body`;
 
-		const result = updateFrontmatterWithAtUri(content, "at://did:plc:abc/post/123");
+		const result = updateFrontmatterWithAtUri(
+			content,
+			"at://did:plc:abc/post/123",
+		);
 		expect(result).toContain('atUri: "at://did:plc:abc/post/123"');
 		expect(result).toContain("title: My Post");
 	});
@@ -331,14 +338,20 @@ title = My Post
 +++
 Body`;
 
-		const result = updateFrontmatterWithAtUri(content, "at://did:plc:abc/post/123");
+		const result = updateFrontmatterWithAtUri(
+			content,
+			"at://did:plc:abc/post/123",
+		);
 		expect(result).toContain('atUri = "at://did:plc:abc/post/123"');
 	});
 
 	test("creates frontmatter with atUri when none exists", () => {
 		const content = "# My Post\n\nSome body text";
 
-		const result = updateFrontmatterWithAtUri(content, "at://did:plc:abc/post/123");
+		const result = updateFrontmatterWithAtUri(
+			content,
+			"at://did:plc:abc/post/123",
+		);
 		expect(result).toContain('atUri: "at://did:plc:abc/post/123"');
 		expect(result).toContain("---");
 		expect(result).toContain("# My Post\n\nSome body text");
@@ -351,7 +364,10 @@ atUri: "at://did:plc:old/post/000"
 ---
 Body`;
 
-		const result = updateFrontmatterWithAtUri(content, "at://did:plc:new/post/999");
+		const result = updateFrontmatterWithAtUri(
+			content,
+			"at://did:plc:new/post/999",
+		);
 		expect(result).toContain('atUri: "at://did:plc:new/post/999"');
 		expect(result).not.toContain("old");
 	});
@@ -363,7 +379,10 @@ atUri = "at://did:plc:old/post/000"
 +++
 Body`;
 
-		const result = updateFrontmatterWithAtUri(content, "at://did:plc:new/post/999");
+		const result = updateFrontmatterWithAtUri(
+			content,
+			"at://did:plc:new/post/999",
+		);
 		expect(result).toContain('atUri = "at://did:plc:new/post/999"');
 		expect(result).not.toContain("old");
 	});
