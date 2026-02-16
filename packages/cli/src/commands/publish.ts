@@ -17,6 +17,7 @@ import {
 	resolveImagePath,
 	createBlueskyPost,
 	addBskyPostRefToDocument,
+	deleteRecord,
 } from "../lib/atproto";
 import {
 	scanContentDirectory,
@@ -26,7 +27,14 @@ import {
 } from "../lib/markdown";
 import type { BlogPost, BlobObject, StrongRef } from "../lib/types";
 import { exitOnCancel } from "../lib/prompts";
-import { createNote, updateNote, findPostsWithStaleLinks, type NoteOptions } from "../extensions/remanso"
+import {
+	createNote,
+	updateNote,
+	deleteNote,
+	findPostsWithStaleLinks,
+	type NoteOptions,
+} from "../extensions/remanso";
+import { fileExists } from "../lib/utils";
 
 export const publishCommand = command({
 	name: "publish",
@@ -160,6 +168,48 @@ export const publishCommand = command({
 		});
 		s.stop(`Found ${posts.length} posts`);
 
+		// Detect deleted files: state entries whose local files no longer exist
+		const scannedPaths = new Set(
+			posts.map((p) => path.relative(configDir, p.filePath)),
+		);
+		const deletedEntries: Array<{ filePath: string; atUri: string }> = [];
+		for (const [filePath, postState] of Object.entries(state.posts)) {
+			if (!scannedPaths.has(filePath) && postState.atUri) {
+				// Check if the file truly doesn't exist (not just excluded by ignore patterns)
+				const absolutePath = path.resolve(configDir, filePath);
+
+				// If file exists but wasn't scanned (e.g. draft or ignored) — skip
+				if (!(await fileExists(absolutePath))) {
+					deletedEntries.push({ filePath, atUri: postState.atUri });
+				}
+			}
+		}
+
+		// Shared agent — created lazily, reused across deletion and publishing
+		let agent: Awaited<ReturnType<typeof createAgent>> | undefined;
+		async function getAgent(): Promise<
+			Awaited<ReturnType<typeof createAgent>>
+		> {
+			if (agent) return agent;
+
+			if (!credentials) {
+				throw new Error("credentials not found");
+			}
+
+			const connectingTo =
+				credentials.type === "oauth" ? credentials.handle : credentials.pdsUrl;
+			s.start(`Connecting as ${connectingTo}...`);
+			try {
+				agent = await createAgent(credentials);
+				s.stop(`Logged in as ${agent.did}`);
+				return agent;
+			} catch (error) {
+				s.stop("Failed to login");
+				log.error(`Failed to login: ${error}`);
+				process.exit(1);
+			}
+		}
+
 		// Determine which posts need publishing
 		const postsToPublish: Array<{
 			post: BlogPost;
@@ -261,18 +311,11 @@ export const publishCommand = command({
 			return;
 		}
 
-		// Create agent
-		const connectingTo =
-			credentials.type === "oauth" ? credentials.handle : credentials.pdsUrl;
-		s.start(`Connecting as ${connectingTo}...`);
-		let agent: Awaited<ReturnType<typeof createAgent>> | undefined;
-		try {
-			agent = await createAgent(credentials);
-			s.stop(`Logged in as ${agent.did}`);
-		} catch (error) {
-			s.stop("Failed to login");
-			log.error(`Failed to login: ${error}`);
-			process.exit(1);
+		// Ensure agent is connected
+		await getAgent();
+
+		if (!agent) {
+			throw new Error("agent is not connected");
 		}
 
 		// Publish posts
@@ -295,16 +338,16 @@ export const publishCommand = command({
 		}> = [];
 
 		for (const { post, action } of postsToPublish) {
-      const trimmedContent = post.content.trim()
-      const titleMatch = trimmedContent.match(/^# (.+)$/m)
-      const title = titleMatch ? titleMatch[1] : post.frontmatter.title
-      s.start(`Publishing: ${title}`);
+			const trimmedContent = post.content.trim();
+			const titleMatch = trimmedContent.match(/^# (.+)$/m);
+			const title = titleMatch ? titleMatch[1] : post.frontmatter.title;
+			s.start(`Publishing: ${title}`);
 
-      // Init publish date
-      if (!post.frontmatter.publishDate) {
-        const [publishDate] = new Date().toISOString().split("T")
-        post.frontmatter.publishDate = publishDate!
-      }
+			// Init publish date
+			if (!post.frontmatter.publishDate) {
+				const [publishDate] = new Date().toISOString().split("T");
+				post.frontmatter.publishDate = publishDate!;
+			}
 
 			try {
 				// Handle cover image upload
@@ -474,6 +517,9 @@ export const publishCommand = command({
 
 		// Summary
 		log.message("\n---");
+		if (deletedEntries.length > 0) {
+			log.info(`Deleted: ${deletedEntries.length}`);
+		}
 		log.info(`Published: ${publishedCount}`);
 		log.info(`Updated: ${updatedCount}`);
 		if (bskyPostCount > 0) {

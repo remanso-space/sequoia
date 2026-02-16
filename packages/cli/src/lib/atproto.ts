@@ -251,10 +251,10 @@ export async function createDocument(
 		config.pathTemplate,
 	);
 	const publishDate = new Date(post.frontmatter.publishDate);
-  const trimmedContent = post.content.trim()
+	const trimmedContent = post.content.trim();
 	const textContent = getTextContent(post, config.textContentField);
-  const titleMatch = trimmedContent.match(/^# (.+)$/m)
-  const title = titleMatch ? titleMatch[1] : post.frontmatter.title
+	const titleMatch = trimmedContent.match(/^# (.+)$/m);
+	const title = titleMatch ? titleMatch[1] : post.frontmatter.title;
 
 	const record: Record<string, unknown> = {
 		$type: "site.standard.document",
@@ -309,10 +309,10 @@ export async function updateDocument(
 		config.pathTemplate,
 	);
 	const publishDate = new Date(post.frontmatter.publishDate);
-  const trimmedContent = post.content.trim()
+	const trimmedContent = post.content.trim();
 	const textContent = getTextContent(post, config.textContentField);
-  const titleMatch = trimmedContent.match(/^# (.+)$/m)
-  const title = titleMatch ? titleMatch[1] : post.frontmatter.title
+	const titleMatch = trimmedContent.match(/^# (.+)$/m);
+	const title = titleMatch ? titleMatch[1] : post.frontmatter.title;
 
 	const record: Record<string, unknown> = {
 		$type: "site.standard.document",
@@ -390,9 +390,9 @@ export async function listDocuments(
 			limit: 100,
 			cursor,
 		});
-    
+
 		for (const record of response.data.records) {
-      if (!isDocumentRecord(record.value)) {
+			if (!isDocumentRecord(record.value)) {
 				continue;
 			}
 
@@ -547,6 +547,16 @@ export async function updatePublication(
 		collection: parsed.collection,
 		rkey: parsed.rkey,
 		record,
+	});
+}
+
+export async function deleteRecord(agent: Agent, atUri: string): Promise<void> {
+	const parsed = parseAtUri(atUri);
+	if (!parsed) throw new Error(`Invalid atUri format: ${atUri}`);
+	await agent.com.atproto.repo.deleteRecord({
+		repo: parsed.did,
+		collection: parsed.collection,
+		rkey: parsed.rkey,
 	});
 }
 
