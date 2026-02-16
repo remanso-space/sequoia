@@ -31,10 +31,7 @@ describe("resolveInternalLinks", () => {
 
 	test("rewrites published link to remanso atUri", () => {
 		const posts = [
-			makePost(
-				"other-post",
-				"at://did:plc:abc/site.standard.document/abc123",
-			),
+			makePost("other-post", "at://did:plc:abc/site.standard.document/abc123"),
 		];
 		const content = "See [my post](./other-post)";
 		expect(resolveInternalLinks(content, posts)).toBe(
@@ -60,10 +57,7 @@ describe("resolveInternalLinks", () => {
 
 	test("handles .md extension in link path", () => {
 		const posts = [
-			makePost(
-				"guide",
-				"at://did:plc:abc/site.standard.document/guide123",
-			),
+			makePost("guide", "at://did:plc:abc/site.standard.document/guide123"),
 		];
 		const content = "Read the [guide](guide.md)";
 		expect(resolveInternalLinks(content, posts)).toBe(
@@ -73,10 +67,7 @@ describe("resolveInternalLinks", () => {
 
 	test("handles nested slug matching", () => {
 		const posts = [
-			makePost(
-				"blog/my-post",
-				"at://did:plc:abc/site.standard.document/rkey1",
-			),
+			makePost("blog/my-post", "at://did:plc:abc/site.standard.document/rkey1"),
 		];
 		const content = "See [post](my-post)";
 		expect(resolveInternalLinks(content, posts)).toBe(
@@ -86,10 +77,7 @@ describe("resolveInternalLinks", () => {
 
 	test("does not rewrite image embeds", () => {
 		const posts = [
-			makePost(
-				"photo",
-				"at://did:plc:abc/site.standard.document/photo1",
-			),
+			makePost("photo", "at://did:plc:abc/site.standard.document/photo1"),
 		];
 		const content = "![alt](photo)";
 		expect(resolveInternalLinks(content, posts)).toBe("![alt](photo)");
@@ -97,10 +85,7 @@ describe("resolveInternalLinks", () => {
 
 	test("does not rewrite @mention links", () => {
 		const posts = [
-			makePost(
-				"mention",
-				"at://did:plc:abc/site.standard.document/m1",
-			),
+			makePost("mention", "at://did:plc:abc/site.standard.document/m1"),
 		];
 		const content = "@[name](mention)";
 		expect(resolveInternalLinks(content, posts)).toBe("@[name](mention)");
@@ -108,10 +93,7 @@ describe("resolveInternalLinks", () => {
 
 	test("handles multiple links in same content", () => {
 		const posts = [
-			makePost(
-				"published",
-				"at://did:plc:abc/site.standard.document/pub1",
-			),
+			makePost("published", "at://did:plc:abc/site.standard.document/pub1"),
 			makePost("unpublished"),
 		];
 		const content =
@@ -123,10 +105,7 @@ describe("resolveInternalLinks", () => {
 
 	test("handles index path normalization", () => {
 		const posts = [
-			makePost(
-				"docs",
-				"at://did:plc:abc/site.standard.document/docs1",
-			),
+			makePost("docs", "at://did:plc:abc/site.standard.document/docs1"),
 		];
 		const content = "See [docs](./docs/index)";
 		expect(resolveInternalLinks(content, posts)).toBe(
@@ -218,11 +197,7 @@ describe("findPostsWithStaleLinks", () => {
 				content: "Check out [post](my-post)",
 			}),
 		];
-		const result = findPostsWithStaleLinks(
-			posts,
-			["blog/my-post"],
-			new Set(),
-		);
+		const result = findPostsWithStaleLinks(posts, ["blog/my-post"], new Set());
 		expect(result).toHaveLength(1);
 	});
 

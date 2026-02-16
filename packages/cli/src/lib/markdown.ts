@@ -23,21 +23,20 @@ export function parseFrontmatter(
 	const match = content.match(frontmatterRegex);
 
 	if (!match) {
-    const [, titleMatch] = content.trim().match(/^# (.+)$/m) || []
-    const title = titleMatch ?? ""
-    const [publishDate] = new Date().toISOString().split("T")
+		const [, titleMatch] = content.trim().match(/^# (.+)$/m) || [];
+		const title = titleMatch ?? "";
+		const [publishDate] = new Date().toISOString().split("T");
 
-    return {
-      frontmatter: {
-        title,
-        publishDate: publishDate ?? ""
-      },
-      body: content,
-      rawFrontmatter: {
-        title:
-        publishDate
-      }
-    }
+		return {
+			frontmatter: {
+				title,
+				publishDate: publishDate ?? "",
+			},
+			body: content,
+			rawFrontmatter: {
+				title: publishDate,
+			},
+		};
 	}
 
 	const delimiter = match[1];
@@ -383,6 +382,32 @@ export function updateFrontmatterWithAtUri(
 	const afterEnd = rawContent.slice(frontmatterEndIndex);
 
 	return `${beforeEnd}${atUriEntry}\n${afterEnd}`;
+}
+
+export function removeFrontmatterAtUri(rawContent: string): string {
+	const frontmatterRegex = /^(---|\+\+\+|\*\*\*)\n([\s\S]*?)\n\1\n/;
+	const match = rawContent.match(frontmatterRegex);
+	if (!match) return rawContent;
+
+	const delimiter = match[1];
+	const frontmatterStr = match[2] ?? "";
+
+	// Remove the atUri line
+	const lines = frontmatterStr
+		.split("\n")
+		.filter((line) => !line.match(/^\s*atUri\s*[=:]\s*/));
+
+	// Check if remaining frontmatter has any non-empty lines
+	const hasContent = lines.some((line) => line.trim() !== "");
+
+	const afterFrontmatter = rawContent.slice(match[0].length);
+
+	if (!hasContent) {
+		// Remove entire frontmatter block, trim leading newlines
+		return afterFrontmatter.replace(/^\n+/, "");
+	}
+
+	return `${delimiter}\n${lines.join("\n")}\n${delimiter}\n${afterFrontmatter}`;
 }
 
 export function stripMarkdownForText(markdown: string): string {
