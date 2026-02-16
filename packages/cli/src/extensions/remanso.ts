@@ -181,48 +181,11 @@ function parseRkey(atUri: string): string {
   return uriMatch[3]!
 }
 
-export async function createNote(
+async function buildNoteRecord(
   agent: Agent,
   post: BlogPost,
-  atUri: string,
   options: NoteOptions,
-): Promise<void> {
-  const rkey = parseRkey(atUri)
-  const publishDate = new Date(post.frontmatter.publishDate).toISOString()
-  const trimmedContent = post.content.trim()
-  const titleMatch = trimmedContent.match(/^# (.+)$/m)
-  const title = titleMatch ? titleMatch[1] : post.frontmatter.title
-
-  const { content, images } = await processNoteContent(agent, post, options)
-
-  const record: Record<string, unknown> = {
-    $type: LEXICON,
-    title,
-    content: content.slice(0, MAX_CONTENT),
-    createdAt: publishDate,
-    publishedAt: publishDate,
-  }
-
-  if (images.length > 0) {
-    record.images = images
-  }
-
-  await agent.com.atproto.repo.createRecord({
-    repo: agent.did!,
-    collection: LEXICON,
-    record,
-    rkey,
-    validate: false,
-  })
-}
-
-export async function updateNote(
-  agent: Agent,
-  post: BlogPost,
-  atUri: string,
-  options: NoteOptions,
-): Promise<void> {
-  const rkey = parseRkey(atUri)
+): Promise<Record<string, unknown>> {
   const publishDate = new Date(post.frontmatter.publishDate).toISOString()
   const trimmedContent = post.content.trim()
   const titleMatch = trimmedContent.match(/^# (.+)$/m)
@@ -248,11 +211,41 @@ export async function updateNote(
 
   if (post.frontmatter.fontSize) {
     record.fontSize = post.frontmatter.fontSize
-  }  
+  }
 
   if (post.frontmatter.fontFamily) {
     record.fontFamily = post.frontmatter.fontFamily
   }
+
+  return record
+}
+
+export async function createNote(
+  agent: Agent,
+  post: BlogPost,
+  atUri: string,
+  options: NoteOptions,
+): Promise<void> {
+  const rkey = parseRkey(atUri)
+  const record = await buildNoteRecord(agent, post, options)
+
+  await agent.com.atproto.repo.createRecord({
+    repo: agent.did!,
+    collection: LEXICON,
+    record,
+    rkey,
+    validate: false,
+  })
+}
+
+export async function updateNote(
+  agent: Agent,
+  post: BlogPost,
+  atUri: string,
+  options: NoteOptions,
+): Promise<void> {
+  const rkey = parseRkey(atUri)
+  const record = await buildNoteRecord(agent, post, options)
 
   await agent.com.atproto.repo.putRecord({
     repo: agent.did!,
