@@ -34,13 +34,33 @@ runs:
     - name: Setup Bun
       uses: oven-sh/setup-bun@v2
 
-    - name: Build and install Sequoia CLI
+    - name: Cache dependencies
+      id: deps-cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.action_path }}/node_modules
+        key: sequoia-deps-${{ runner.os }}-${{ hashFiles(format('{0}/bun.lock', github.action_path)) }}
+
+    - name: Install dependencies
+      if: steps.deps-cache.outputs.cache-hit != 'true'
       shell: bash
-      run: |
-        cd ${{ github.action_path }}
-        bun install
-        bun run build:cli
-        bun link --cwd packages/cli
+      run: cd ${{ github.action_path }} && bun install
+
+    - name: Cache build artifacts
+      id: build-cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.action_path }}/packages/cli/dist
+        key: sequoia-build-${{ runner.os }}-${{ hashFiles(format('{0}/bun.lock', github.action_path), format('{0}/packages/cli/src/**', github.action_path)) }}
+
+    - name: Build CLI
+      if: steps.build-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: cd ${{ github.action_path }} && bun run build:cli
+
+    - name: Link CLI
+      shell: bash
+      run: cd ${{ github.action_path }} && bun link --cwd packages/cli
 
     - name: Sync state from ATProtocol
       shell: bash
