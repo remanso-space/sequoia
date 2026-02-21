@@ -14,7 +14,17 @@ const COMPONENTS_DIR = path.join(__dirname, "components");
 
 const DEFAULT_COMPONENTS_PATH = "src/components";
 
-const AVAILABLE_COMPONENTS = ["sequoia-comments"];
+const AVAILABLE_COMPONENTS: { name: string; notes?: string }[] = [
+	{
+		name: "sequoia-comments",
+		notes:
+			`The component will automatically read the document URI from:\n` +
+			`<link rel="site.standard.document" href="at://...">`,
+	},
+	{
+		name: "sequoia-subscribe",
+	},
+];
 
 export const addCommand = command({
 	name: "add",
@@ -30,11 +40,12 @@ export const addCommand = command({
 		intro("Add Sequoia Component");
 
 		// Validate component name
-		if (!AVAILABLE_COMPONENTS.includes(componentName)) {
+		const component = AVAILABLE_COMPONENTS.find((c) => c.name === componentName);
+		if (!component) {
 			log.error(`Component '${componentName}' not found`);
 			log.info("Available components:");
 			for (const comp of AVAILABLE_COMPONENTS) {
-				log.info(`  - ${comp}`);
+				log.info(`  - ${comp.name}`);
 			}
 			process.exit(1);
 		}
@@ -143,14 +154,14 @@ export const addCommand = command({
 		}
 
 		// Show usage instructions
-		note(
+		let notes =
 			`Add to your HTML:\n\n` +
-				`<script type="module" src="${componentsDir}/${componentName}.js"></script>\n` +
-				`<${componentName}></${componentName}>\n\n` +
-				`The component will automatically read the document URI from:\n` +
-				`<link rel="site.standard.document" href="at://...">`,
-			"Usage",
-		);
+			`<script type="module" src="${componentsDir}/${componentName}.js"></script>\n` +
+			`<${componentName}></${componentName}>\n`;
+		if (component.notes) {
+			notes += `\n${component.notes}`;
+		}
+		note(notes, "Usage");
 
 		outro(`${componentName} added successfully!`);
 	},
