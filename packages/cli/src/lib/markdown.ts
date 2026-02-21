@@ -234,8 +234,11 @@ export function getSlugFromOptions(
 export function resolvePathTemplate(template: string, post: BlogPost): string {
 	const publishDate = new Date(post.frontmatter.publishDate);
 	const year = String(publishDate.getFullYear());
+	const yearUTC = String(publishDate.getUTCFullYear());
 	const month = String(publishDate.getMonth() + 1).padStart(2, "0");
+	const monthUTC = String(publishDate.getUTCMonth() + 1).padStart(2, "0");
 	const day = String(publishDate.getDate()).padStart(2, "0");
+	const dayUTC = String(publishDate.getUTCDate()).padStart(2, "0");
 
 	const slugifiedTitle = (post.frontmatter.title || "")
 		.toLowerCase()
@@ -246,8 +249,11 @@ export function resolvePathTemplate(template: string, post: BlogPost): string {
 	let result = template
 		.replace(/\{slug\}/g, post.slug)
 		.replace(/\{year\}/g, year)
+		.replace(/\{yearUTC\}/g, yearUTC)
 		.replace(/\{month\}/g, month)
+		.replace(/\{monthUTC\}/g, monthUTC)
 		.replace(/\{day\}/g, day)
+		.replace(/\{dayUTC\}/g, dayUTC)
 		.replace(/\{title\}/g, slugifiedTitle);
 
 	// Replace any remaining {field} tokens with raw frontmatter values

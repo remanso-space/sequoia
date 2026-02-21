@@ -133,9 +133,12 @@ This would produce paths like `/blog/2024/01/my-post`.
 | Token | Description | Example |
 |-------|-------------|---------|
 | `{slug}` | The generated slug (from filepath or `slugField`) | `my-post` |
-| `{year}` | Four-digit publish year | `2024` |
-| `{month}` | Zero-padded publish month | `01` |
-| `{day}` | Zero-padded publish day | `15` |
+| `{year}` | Four-digit publish year (local time) | `2024` |
+| `{yearUTC}` | Four-digit publish year (UTC) | `2024` |
+| `{month}` | Zero-padded publish month (local time) | `01` |
+| `{monthUTC}` | Zero-padded publish month (UTC) | `01` |
+| `{day}` | Zero-padded publish day (local time) | `15` |
+| `{dayUTC}` | Zero-padded publish day (UTC) | `15` |
 | `{title}` | Slugified post title | `my-first-post` |
 | `{field}` | Any frontmatter field value (string fields only) | - |
 
