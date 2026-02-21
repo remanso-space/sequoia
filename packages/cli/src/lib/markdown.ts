@@ -1,7 +1,9 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { glob } from "glob";
+import yaml from "js-yaml";
 import { minimatch } from "minimatch";
+import * as toml from "smol-toml";
 import type { BlogPost, FrontmatterMapping, PostFrontmatter } from "./types";
 
 export function parseFrontmatter(
@@ -31,88 +33,14 @@ export function parseFrontmatter(
 	// +++ uses TOML (key = value)
 	// --- and *** use YAML (key: value)
 	const isToml = delimiter === "+++";
-	const separator = isToml ? "=" : ":";
 
-	// Parse frontmatter manually
-	const raw: Record<string, unknown> = {};
-	const lines = frontmatterStr.split("\n");
-
-	let i = 0;
-	while (i < lines.length) {
-		const line = lines[i];
-		if (line === undefined) {
-			i++;
-			continue;
-		}
-		const sepIndex = line.indexOf(separator);
-		if (sepIndex === -1) {
-			i++;
-			continue;
-		}
-
-		const key = line.slice(0, sepIndex).trim();
-		let value = line.slice(sepIndex + 1).trim();
-
-		// Handle quoted strings
-		if (
-			(value.startsWith('"') && value.endsWith('"')) ||
-			(value.startsWith("'") && value.endsWith("'"))
-		) {
-			value = value.slice(1, -1);
-		}
-
-		// Handle inline arrays (simple case for tags)
-		if (value.startsWith("[") && value.endsWith("]")) {
-			const arrayContent = value.slice(1, -1);
-			raw[key] = arrayContent
-				.split(",")
-				.map((item) => item.trim().replace(/^["']|["']$/g, ""));
-		} else if (value === "" && !isToml) {
-			// Check for YAML-style multiline array (key with no value followed by - items)
-			const arrayItems: string[] = [];
-			let j = i + 1;
-			while (j < lines.length) {
-				const nextLine = lines[j];
-				if (nextLine === undefined) {
-					j++;
-					continue;
-				}
-				// Check if line is a list item (starts with whitespace and -)
-				const listMatch = nextLine.match(/^\s+-\s*(.*)$/);
-				if (listMatch && listMatch[1] !== undefined) {
-					let itemValue = listMatch[1].trim();
-					// Remove quotes if present
-					if (
-						(itemValue.startsWith('"') && itemValue.endsWith('"')) ||
-						(itemValue.startsWith("'") && itemValue.endsWith("'"))
-					) {
-						itemValue = itemValue.slice(1, -1);
-					}
-					arrayItems.push(itemValue);
-					j++;
-				} else if (nextLine.trim() === "") {
-					// Skip empty lines within the array
-					j++;
-				} else {
-					// Hit a new key or non-list content
-					break;
-				}
-			}
-			if (arrayItems.length > 0) {
-				raw[key] = arrayItems;
-				i = j;
-				continue;
-			} else {
-				raw[key] = value;
-			}
-		} else if (value === "true") {
-			raw[key] = true;
-		} else if (value === "false") {
-			raw[key] = false;
-		} else {
-			raw[key] = value;
-		}
-		i++;
+	// Parse frontmatter using the appropriate library
+	let raw: Record<string, unknown>;
+	if (isToml) {
+		raw = toml.parse(frontmatterStr) as Record<string, unknown>;
+	} else {
+		// Use CORE_SCHEMA to keep dates as strings rather than Date objects
+		raw = (yaml.load(frontmatterStr, { schema: yaml.CORE_SCHEMA }) as Record<string, unknown>) ?? {};
 	}
 
 	// Apply field mappings to normalize to standard PostFrontmatter fields
