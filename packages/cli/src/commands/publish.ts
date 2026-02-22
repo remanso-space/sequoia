@@ -28,13 +28,6 @@ import {
 } from "../lib/markdown";
 import type { BlogPost, BlobObject, StrongRef } from "../lib/types";
 import { exitOnCancel } from "../lib/prompts";
-import {
-	createNote,
-	updateNote,
-	deleteNote,
-	findPostsWithStaleLinks,
-	type NoteOptions,
-} from "../extensions/remanso";
 import { fileExists } from "../lib/utils";
 
 export const publishCommand = command({
@@ -379,19 +372,6 @@ export const publishCommand = command({
 		let errorCount = 0;
 		let bskyPostCount = 0;
 
-		const context: NoteOptions = {
-			contentDir,
-			imagesDir,
-			allPosts: posts,
-		};
-
-		// Pass 1: Create/update document records and collect note queue
-		const noteQueue: Array<{
-			post: BlogPost;
-			action: "create" | "update";
-			atUri: string;
-		}> = [];
-
 		for (const { post, action } of postsToPublish) {
 			const trimmedContent = post.content.trim();
 			const titleMatch = trimmedContent.match(/^# (.+)$/m);
@@ -510,60 +490,12 @@ export const publishCommand = command({
 					bskyPostRef,
 				};
 
-				noteQueue.push({ post, action, atUri });
 			} catch (error) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);
 				s.stop(`Error publishing "${path.basename(post.filePath)}"`);
 				log.error(`  ${errorMessage}`);
 				errorCount++;
-			}
-		}
-
-		// Pass 2: Create/update Remanso notes (atUris are now available for link resolution)
-		for (const { post, action, atUri } of noteQueue) {
-			try {
-				if (action === "create") {
-					await createNote(agent, post, atUri, context);
-				} else {
-					await updateNote(agent, post, atUri, context);
-				}
-			} catch (error) {
-				log.warn(
-					`Failed to create note for "${post.frontmatter.title}": ${error instanceof Error ? error.message : String(error)}`,
-				);
-			}
-		}
-
-		// Re-process already-published posts with stale links to newly created posts
-		const newlyCreatedSlugs = noteQueue
-			.filter((r) => r.action === "create")
-			.map((r) => r.post.slug);
-
-		if (newlyCreatedSlugs.length > 0) {
-			const batchFilePaths = new Set(noteQueue.map((r) => r.post.filePath));
-			const stalePosts = findPostsWithStaleLinks(
-				posts,
-				newlyCreatedSlugs,
-				batchFilePaths,
-			);
-
-			for (const stalePost of stalePosts) {
-				try {
-					s.start(`Updating links in: ${stalePost.frontmatter.title}`);
-					await updateNote(
-						agent,
-						stalePost,
-						stalePost.frontmatter.atUri!,
-						context,
-					);
-					s.stop(`Updated links: ${stalePost.frontmatter.title}`);
-				} catch (error) {
-					s.stop(`Failed to update links: ${stalePost.frontmatter.title}`);
-					log.warn(
-						`  ${error instanceof Error ? error.message : String(error)}`,
-					);
-				}
 			}
 		}
 
@@ -574,17 +506,6 @@ export const publishCommand = command({
 				const ag = await getAgent();
 				s.start(`Deleting: ${filePath}`);
 				await deleteRecord(ag, atUri);
-
-				// Try to delete the corresponding Remanso note
-				try {
-					const noteAtUri = atUri.replace(
-						"site.standard.document",
-						"space.remanso.note",
-					);
-					await deleteNote(ag, noteAtUri);
-				} catch {
-					// Note may not exist, ignore
-				}
 
 				delete state.posts[filePath];
 				s.stop(`Deleted: ${filePath}`);
@@ -602,17 +523,6 @@ export const publishCommand = command({
 				const ag = await getAgent();
 				s.start(`Deleting unmatched: ${title}`);
 				await deleteRecord(ag, atUri);
-
-				// Try to delete the corresponding Remanso note
-				try {
-					const noteAtUri = atUri.replace(
-						"site.standard.document",
-						"space.remanso.note",
-					);
-					await deleteNote(ag, noteAtUri);
-				} catch {
-					// Note may not exist, ignore
-				}
 
 				s.stop(`Deleted unmatched: ${title}`);
 				unmatchedDeletedCount++;

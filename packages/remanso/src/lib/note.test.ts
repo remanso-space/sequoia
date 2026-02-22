@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { resolveInternalLinks, findPostsWithStaleLinks } from "./remanso";
-import type { BlogPost } from "../lib/types";
+import { resolveInternalLinks, findPostsWithStaleLinks } from "./note";
+import type { BlogPost } from "../../../cli/src/lib/types";
 
 function makePost(
 	slug: string,

@@ -17,7 +17,8 @@
 		"deploy:docs": "cd docs && bun run deploy",
 		"deploy:cli": "cd packages/cli && bun run deploy",
 		"deploy:remanso": "cd packages/remanso && bun run deploy",
-		"test:cli": "cd packages/cli && bun test"
+		"test:cli": "cd packages/cli && bun test",
+		"test:remanso": "cd packages/remanso && bun test"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
