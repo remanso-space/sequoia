@@ -1,5 +1,5 @@
-name: 'Sequoia Publish'
-description: 'Publish your markdown content to ATProtocol using Sequoia CLI'
+name: 'Remanso Publish'
+description: 'Publish your .pub.md notes to ATProtocol using Remanso CLI'
 branding:
   icon: 'upload-cloud'
   color: 'green'
@@ -16,15 +16,15 @@ inputs:
     required: false
     default: 'https://bsky.social'
   force:
-    description: 'Force publish all posts, ignoring change detection'
+    description: 'Force publish all notes, ignoring change detection'
     required: false
     default: 'false'
   commit-back:
-    description: 'Commit updated frontmatter and state file back to the repo'
+    description: 'Commit updated frontmatter back to the repo'
     required: false
     default: 'true'
   working-directory:
-    description: 'Directory containing sequoia.json (defaults to repo root)'
+    description: 'Directory containing remanso.json (defaults to repo root)'
     required: false
     default: '.'
 
@@ -39,7 +39,7 @@ runs:
       uses: actions/cache@v4
       with:
         path: ${{ github.action_path }}/node_modules
-        key: sequoia-deps-${{ runner.os }}-${{ hashFiles(format('{0}/bun.lock', github.action_path)) }}
+        key: remanso-deps-${{ runner.os }}-${{ hashFiles(format('{0}/bun.lock', github.action_path)) }}
 
     - name: Install dependencies
       if: steps.deps-cache.outputs.cache-hit != 'true'
@@ -50,17 +50,17 @@ runs:
       id: build-cache
       uses: actions/cache@v4
       with:
-        path: ${{ github.action_path }}/packages/cli/dist
-        key: sequoia-build-${{ runner.os }}-${{ hashFiles(format('{0}/bun.lock', github.action_path), format('{0}/packages/cli/src/**', github.action_path)) }}
+        path: ${{ github.action_path }}/packages/remanso/dist
+        key: remanso-build-${{ runner.os }}-${{ hashFiles(format('{0}/bun.lock', github.action_path), format('{0}/packages/remanso/src/**', github.action_path)) }}
 
     - name: Build CLI
       if: steps.build-cache.outputs.cache-hit != 'true'
       shell: bash
-      run: cd ${{ github.action_path }} && bun run build:cli
+      run: cd ${{ github.action_path }} && bun run build:remanso
 
     - name: Link CLI
       shell: bash
-      run: cd ${{ github.action_path }} && bun link --cwd packages/cli
+      run: cd ${{ github.action_path }} && bun link --cwd packages/remanso
 
     - name: Sync state from ATProtocol
       shell: bash
@@ -69,7 +69,7 @@ runs:
         ATP_IDENTIFIER: ${{ inputs.identifier }}
         ATP_APP_PASSWORD: ${{ inputs.app-password }}
         PDS_URL: ${{ inputs.pds-url }}
-      run: sequoia sync
+      run: remanso sync
 
     - name: Publish
       shell: bash
@@ -83,7 +83,7 @@ runs:
         if [ "${{ inputs.force }}" = "true" ]; then
           FLAGS="--force"
         fi
-        sequoia publish $FLAGS
+        remanso publish $FLAGS
 
     - name: Commit back changes
       if: inputs.commit-back == 'true'
@@ -92,10 +92,10 @@ runs:
       run: |
         git config user.name "$(git log -1 --format='%an')"
         git config user.email "$(git log -1 --format='%ae')"
-        git add -A -- '**/*.md' || true
+        git add -A -- '**/*.pub.md' || true
         if git diff --cached --quiet; then
           echo "No changes to commit"
         else
-          git commit -m "chore: update sequoia state [skip ci]"
+          git commit -m "chore: update remanso state [skip ci]"
           git push
         fi

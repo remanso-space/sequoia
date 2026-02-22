@@ -1,0 +1,25 @@
+{
+	"name": "remanso-cli",
+	"version": "0.1.0",
+	"type": "module",
+	"bin": { "remanso": "dist/index.js" },
+	"scripts": {
+		"build": "bun build src/index.ts --target node --outdir dist",
+		"dev": "bun run build && bun link",
+		"lint": "biome lint --write src",
+		"format": "biome format --write src"
+	},
+	"dependencies": {
+		"@atproto/api": "^0.18.17",
+		"@clack/prompts": "^1.0.0",
+		"cmd-ts": "^0.14.3",
+		"glob": "^13.0.0",
+		"mime-types": "^2.1.35",
+		"minimatch": "^10.1.1"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.3.13",
+		"@types/mime-types": "^3.0.1",
+		"@types/node": "^20"
+	}
+}

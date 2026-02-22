@@ -138,7 +138,7 @@ export function resolveInternalLinks(
 
 		// Normalize to a slug-like string for comparison
 		const normalized = url
-			.replace(/^\.?\/?/, "")
+			.replace(/^(\.\.\/|\.\/)+/, "")
 			.replace(/\/?$/, "")
 			.replace(/\.mdx?$/, "")
 			.replace(/\/index$/, "");
@@ -292,7 +292,7 @@ export function findPostsWithStaleLinks(
 			if (!isLocalPath(url)) return false;
 
 			const normalized = url
-				.replace(/^\.?\/?/, "")
+				.replace(/^(\.\.\/|\.\/)+/, "")
 				.replace(/\/?$/, "")
 				.replace(/\.mdx?$/, "")
 				.replace(/\/index$/, "");
