@@ -35,7 +35,7 @@ import {
 	deleteNote,
 	findPostsWithStaleLinks,
 	type NoteOptions,
-} from "../../../cli/src/extensions/remanso";
+} from "../lib/note";
 
 async function fileExists(filePath: string): Promise<boolean> {
 	try {
