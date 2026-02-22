@@ -182,6 +182,13 @@ export function getSlugFromOptions(
 	return slug;
 }
 
+export function slugifyTitle(title: string): string {
+	return (title || "")
+		.toLowerCase()
+		.replace(/\s+/g, "-")
+		.replace(/[^\w-]/g, "");
+}
+
 export function resolvePathTemplate(template: string, post: BlogPost): string {
 	const publishDate = new Date(post.frontmatter.publishDate);
 	const year = String(publishDate.getFullYear());
@@ -191,10 +198,7 @@ export function resolvePathTemplate(template: string, post: BlogPost): string {
 	const day = String(publishDate.getDate()).padStart(2, "0");
 	const dayUTC = String(publishDate.getUTCDate()).padStart(2, "0");
 
-	const slugifiedTitle = (post.frontmatter.title || "")
-		.toLowerCase()
-		.replace(/\s+/g, "-")
-		.replace(/[^\w-]/g, "");
+	const slugifiedTitle = slugifyTitle(post.frontmatter.title);
 
 	// Replace known tokens
 	let result = template

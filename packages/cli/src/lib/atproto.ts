@@ -263,8 +263,11 @@ export async function createDocument(
 		path: postPath,
 		textContent: textContent.slice(0, 10000),
 		publishedAt: publishDate.toISOString(),
-		canonicalUrl: `${config.siteUrl}${postPath}`,
 	};
+
+	if (!config.canonicalUrlBuilder) {
+		record.canonicalUrl = `${config.siteUrl}${postPath}`;
+	}
 
 	if (post.frontmatter.description) {
 		record.description = post.frontmatter.description;
@@ -284,7 +287,22 @@ export async function createDocument(
 		record,
 	});
 
-	return response.data.uri;
+	const atUri = response.data.uri;
+
+	if (config.canonicalUrlBuilder) {
+		const parsed = parseAtUri(atUri);
+		if (parsed) {
+			record.canonicalUrl = config.canonicalUrlBuilder(atUri, post);
+			await agent.com.atproto.repo.putRecord({
+				repo: agent.did!,
+				collection: parsed.collection,
+				rkey: parsed.rkey,
+				record,
+			});
+		}
+	}
+
+	return atUri;
 }
 
 export async function updateDocument(
@@ -321,7 +339,9 @@ export async function updateDocument(
 		path: postPath,
 		textContent: textContent.slice(0, 10000),
 		publishedAt: publishDate.toISOString(),
-		canonicalUrl: `${config.siteUrl}${postPath}`,
+		canonicalUrl: config.canonicalUrlBuilder
+			? config.canonicalUrlBuilder(atUri, post)
+			: `${config.siteUrl}${postPath}`,
 	};
 
 	if (post.frontmatter.description) {
