@@ -10,10 +10,7 @@ type SerializedStateData = Omit<InternalStateData, "dpopKey"> & {
 	dpopJwk: Record<string, unknown>;
 };
 
-type SerializedSession = Omit<
-	Parameters<SessionStore["set"]>[1],
-	"dpopKey"
-> & {
+type SerializedSession = Omit<Parameters<SessionStore["set"]>[1], "dpopKey"> & {
 	dpopJwk: Record<string, unknown>;
 };
 
@@ -27,10 +24,7 @@ async function deserializeKey(jwk: Record<string, unknown>): Promise<Key> {
 	return JoseKey.fromJWK(jwk);
 }
 
-export function createStateStore(
-	kv: KVNamespace,
-	ttl = 600,
-): StateStore {
+export function createStateStore(kv: KVNamespace, ttl = 600): StateStore {
 	return {
 		async set(key, { dpopKey, ...rest }) {
 			const data: SerializedStateData = {

@@ -6,7 +6,9 @@
 		"docs"
 	],
 	"scripts": {
-	  "dev:cli": "cd packages/cli && bun run dev",
+		"format:cli": "cd packages/cli && bun run format",
+		"format:docs": "cd docs && bun run format",
+		"dev:cli": "cd packages/cli && bun run dev",
 		"dev:docs": "cd docs && bun run dev",
 		"build:docs": "cd docs && bun run build",
 		"build:cli": "cd packages/cli && bun run build",

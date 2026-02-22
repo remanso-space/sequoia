@@ -2,7 +2,7 @@
 
 ![cover](https://sequoia.pub/og.png)
 
-A CLI for publishing [Standard.site](https://standard.site) documents to the [AT Protocol](https://atproto.com). 
+A CLI for publishing [Standard.site](https://standard.site) documents to the [AT Protocol](https://atproto.com).
 
 > [!NOTE]
 > [Visit the docs for more info](https://sequoia.pub)
@@ -60,7 +60,7 @@ cd packages/cli
 bun dev
 ```
 
-## License 
+## License
 
 MIT
 
