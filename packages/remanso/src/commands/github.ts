@@ -18,7 +18,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - uses: remanso-space/sequoia@main
+      - uses: remanso-space/remanso-cli@main
         with:
           identifier: \${{ secrets.ATP_IDENTIFIER }}
           app-password: \${{ secrets.ATP_APP_PASSWORD }}
