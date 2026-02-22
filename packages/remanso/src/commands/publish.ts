@@ -322,7 +322,7 @@ export const publishCommand = command({
 		}
 
 		// Derive siteUrl from DID
-		const siteUrl = `https://remanso.space/pub/@${agent.did}`;
+		const siteUrl = `https://remanso.space/pub/${agent.did}`;
 		log.info(`Site URL: ${siteUrl}`);
 
 		// Fetch PDS records to detect unmatched documents (if not already done)
@@ -396,7 +396,12 @@ export const publishCommand = command({
 				const relativeFilePath = path.relative(configDir, post.filePath);
 
 				if (action === "create") {
-					atUri = await createDocument(agent, post, publisherConfig as Parameters<typeof createDocument>[2], coverImage);
+					atUri = await createDocument(
+						agent,
+						post,
+						publisherConfig as Parameters<typeof createDocument>[2],
+						coverImage,
+					);
 					post.frontmatter.atUri = atUri;
 					s.stop(`Created: ${atUri}`);
 
@@ -412,7 +417,13 @@ export const publishCommand = command({
 					publishedCount++;
 				} else {
 					atUri = post.frontmatter.atUri!;
-					await updateDocument(agent, post, atUri, publisherConfig as Parameters<typeof updateDocument>[3], coverImage);
+					await updateDocument(
+						agent,
+						post,
+						atUri,
+						publisherConfig as Parameters<typeof updateDocument>[3],
+						coverImage,
+					);
 					s.stop(`Updated: ${atUri}`);
 
 					contentForHash = post.rawContent;

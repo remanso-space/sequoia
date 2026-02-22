@@ -14,7 +14,11 @@ import {
 	text,
 } from "@clack/prompts";
 import { AtpAgent } from "@atproto/api";
-import { resolveHandleToPDS, createPublication, createAgent } from "../../../cli/src/lib/atproto";
+import {
+	resolveHandleToPDS,
+	createPublication,
+	createAgent,
+} from "../../../cli/src/lib/atproto";
 import {
 	loadCredentials,
 	saveCredentials,
@@ -45,7 +49,9 @@ function detectGitHubRemote(): { owner: string; repo: string } | null {
 			stdio: ["pipe", "pipe", "pipe"],
 		}).trim();
 
-		const sshMatch = remote.match(/git@github\.com:([^/]+)\/([^.]+)(?:\.git)?$/);
+		const sshMatch = remote.match(
+			/git@github\.com:([^/]+)\/([^.]+)(?:\.git)?$/,
+		);
 		if (sshMatch) {
 			return { owner: sshMatch[1]!, repo: sshMatch[2]! };
 		}
@@ -136,7 +142,9 @@ export const initCommand = command({
 		let pdsUrl: string | undefined;
 
 		if (credentials?.type === "oauth") {
-			log.warn("OAuth credentials detected but remanso requires App Passwords.");
+			log.warn(
+				"OAuth credentials detected but remanso requires App Passwords.",
+			);
 			credentials = null;
 		}
 
@@ -244,13 +252,15 @@ export const initCommand = command({
 		s.start("Fetching existing publications...");
 		let publications: Array<{ uri: string; name: string; url: string }> = [];
 		try {
-			publications = await listPublications(agent as unknown as InstanceType<typeof AtpAgent>);
+			publications = await listPublications(
+				agent as unknown as InstanceType<typeof AtpAgent>,
+			);
 			s.stop(`Found ${publications.length} existing publication(s)`);
 		} catch {
 			s.stop("Could not fetch publications");
 		}
 
-		const siteUrl = `https://remanso.space/pub/@${agent.did}`;
+		const siteUrl = `https://remanso.space/pub/${agent.did}`;
 
 		if (publications.length > 0) {
 			const pubChoice = exitOnCancel(
