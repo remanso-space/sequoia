@@ -1,8 +1,11 @@
-# Sequoia
+# Remanso CLI
 
-![cover](https://sequoia.pub/og.png)
+> [!NOTE]
+> Remanso CLI is a fork from [Sequoia](https://sequoia.pub) made by [Steve Dylan](https://pds.ls/at://stevedylan.dev)
 
-A CLI for publishing [Standard.site](https://standard.site) documents to the [AT Protocol](https://atproto.com).
+<!-- ![cover](https://sequoia.pub/og.png) -->
+
+A CLI for publishing [Remanso notes](https://remanso.space) alongside [Standard.site](https://standard.site) documents to the [AT Protocol](https://atproto.com).
 
 > [!NOTE]
 > [Visit the docs for more info](https://sequoia.pub)
@@ -12,31 +15,31 @@ A CLI for publishing [Standard.site](https://standard.site) documents to the [AT
 Install the CLI
 
 ```bash
-pnpm i -g sequoia-cli
+pnpm i -g remanso-cli
 ```
 
 Authorize
 
 ```bash
-sequoia auth
+remanso auth
 ```
 
 Initialize in your blog repo
 
 ```bash
-sequoia init
+remanso init
 ```
 
 Publish your posts
 
 ```bash
-sequoia publish
+remanso publish
 ```
 
 Inject link tags for verification (optional)
 
 ```bash
-sequoia inject
+remanso inject
 ```
 
 [Full documentation](https://sequoia.pub)
