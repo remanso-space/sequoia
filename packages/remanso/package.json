@@ -19,7 +19,7 @@
 		"build": "bun build src/index.ts --target node --outdir dist",
 		"test": "bun test",
 		"dev": "bun run build && bun link",
-		"deploy": "bun run build && bun publish"
+		"deploy": "bun run build && bun run release-it"
 	},
 	"dependencies": {
 		"@atproto/api": "^0.18.17",
@@ -32,6 +32,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.3.13",
 		"@types/mime-types": "^3.0.1",
-		"@types/node": "^20"
+		"@types/node": "^20",
+		"release-it": "^19.2.4"
 	}
 }
