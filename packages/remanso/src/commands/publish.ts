@@ -16,12 +16,14 @@ import {
 	resolveImagePath,
 	deleteRecord,
 	listDocuments,
+	parseAtUri,
 } from "../../../cli/src/lib/atproto";
 import {
 	scanContentDirectory,
 	getContentHash,
 	updateFrontmatterWithAtUri,
 	resolvePostPath,
+	slugifyTitle,
 } from "../../../cli/src/lib/markdown";
 import type {
 	BlogPost,
@@ -338,6 +340,12 @@ export const publishCommand = command({
 			imagesDir,
 			pdsUrl: config.pdsUrl,
 			pathPrefix: "",
+			canonicalUrlBuilder: (atUri: string, post: BlogPost) => {
+				const parsed = parseAtUri(atUri);
+				if (!parsed) throw new Error(`Invalid atUri: ${atUri}`);
+				const slug = slugifyTitle(post.frontmatter.title);
+				return `${siteUrl}/${parsed.rkey}/${slug}`;
+			},
 		};
 
 		// Publish posts
