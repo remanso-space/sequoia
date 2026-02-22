@@ -9,7 +9,10 @@ import {
 	getCredentials,
 } from "../lib/credentials";
 import { getOAuthHandle, getOAuthSession } from "../lib/oauth-store";
+import type { Agent } from "@atproto/api";
 import { createAgent, listDocuments } from "../lib/atproto";
+import type { ListDocumentsResult } from "../lib/atproto";
+import type { BlogPost } from "../lib/types";
 import {
 	scanContentDirectory,
 	getContentHash,
@@ -18,6 +21,67 @@ import {
 	resolvePostPath,
 } from "../lib/markdown";
 import { exitOnCancel } from "../lib/prompts";
+
+async function matchesPDS(
+	localPost: BlogPost,
+	doc: ListDocumentsResult,
+	agent: Agent,
+	textContentField?: string,
+): Promise<boolean> {
+	// Compare body text content
+	const localTextContent = getTextContent(localPost, textContentField);
+	if (localTextContent.slice(0, 10000) !== doc.value.textContent) {
+		return false;
+	}
+
+	// Compare document fields: title, description, tags
+	const trimmedContent = localPost.content.trim();
+	const titleMatch = trimmedContent.match(/^# (.+)$/m);
+	const localTitle = titleMatch ? titleMatch[1] : localPost.frontmatter.title;
+	if (localTitle !== doc.value.title) return false;
+
+	const localDescription = localPost.frontmatter.description || undefined;
+	if (localDescription !== doc.value.description) return false;
+
+	const localTags =
+		localPost.frontmatter.tags && localPost.frontmatter.tags.length > 0
+			? localPost.frontmatter.tags
+			: undefined;
+	if (JSON.stringify(localTags) !== JSON.stringify(doc.value.tags)) {
+		return false;
+	}
+
+	// Compare note-specific fields: theme, fontSize, fontFamily.
+	// Fetch the space.remanso.note record to check these fields.
+	const noteUriMatch = doc.uri.match(/^at:\/\/([^/]+)\/[^/]+\/(.+)$/);
+	if (noteUriMatch) {
+		const repo = noteUriMatch[1]!;
+		const rkey = noteUriMatch[2]!;
+		try {
+			const noteResponse = await agent.com.atproto.repo.getRecord({
+				repo,
+				collection: "space.remanso.note",
+				rkey,
+			});
+			const noteValue = noteResponse.data.value as Record<string, unknown>;
+			if (
+				(localPost.frontmatter.theme || undefined) !==
+					(noteValue.theme as string | undefined) ||
+				(localPost.frontmatter.fontSize || undefined) !==
+					(noteValue.fontSize as number | undefined) ||
+				(localPost.frontmatter.fontFamily || undefined) !==
+					(noteValue.fontFamily as string | undefined)
+			) {
+				return false;
+			}
+		} catch {
+			// Note record doesn't exist — treat as matching to avoid
+			// forcing a re-publish of posts never published as notes.
+		}
+	}
+
+	return true;
+}
 
 export const syncCommand = command({
 	name: "sync",
@@ -182,19 +246,14 @@ export const syncCommand = command({
 				log.message(`    URI: ${doc.uri}`);
 				log.message(`    File: ${path.basename(localPost.filePath)}`);
 
-				// Compare local text content with PDS text content to detect changes.
-				// We must avoid storing the local rawContent hash blindly, because
-				// that would make publish think nothing changed even when content
-				// was modified since the last publish.
-				const localTextContent = getTextContent(
-					localPost,
-					config.textContentField,
-				);
-				const contentMatchesPDS =
-					localTextContent.slice(0, 10000) === doc.value.textContent;
-
 				// If local content matches PDS, store the local hash (up to date).
 				// If it differs, store empty hash so publish detects the change.
+				const contentMatchesPDS = await matchesPDS(
+					localPost,
+					doc,
+					agent,
+					config.textContentField,
+				);
 				const contentHash = contentMatchesPDS
 					? await getContentHash(localPost.rawContent)
 					: "";
