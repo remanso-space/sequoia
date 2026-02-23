@@ -4,7 +4,10 @@ import { execSync, spawnSync } from "node:child_process";
 import { command, flag } from "cmd-ts";
 import { log, spinner, confirm, text } from "@clack/prompts";
 import { exitOnCancel } from "../../../cli/src/lib/prompts";
-import { getCredentials, listCredentials } from "../../../cli/src/lib/credentials";
+import {
+	getCredentials,
+	listCredentials,
+} from "../../../cli/src/lib/credentials";
 
 export const WORKFLOW_YAML = `name: Publish to the PDS
 on:
@@ -43,7 +46,9 @@ function detectGitHubRemote(): { owner: string; repo: string } | null {
 		}).trim();
 
 		// Parse SSH: git@github.com:owner/repo.git
-		const sshMatch = remote.match(/git@github\.com:([^/]+)\/([^.]+)(?:\.git)?$/);
+		const sshMatch = remote.match(
+			/git@github\.com:([^/]+)\/([^.]+)(?:\.git)?$/,
+		);
 		if (sshMatch) {
 			return { owner: sshMatch[1]!, repo: sshMatch[2]! };
 		}
@@ -86,9 +91,7 @@ async function generateWorkflow(): Promise<void> {
 async function setSecrets(): Promise<void> {
 	const remote = detectGitHubRemote();
 	if (!remote) {
-		log.warn(
-			"Could not detect GitHub remote. Skipping secret setup.",
-		);
+		log.warn("Could not detect GitHub remote. Skipping secret setup.");
 		log.info(
 			"Add ATP_IDENTIFIER and ATP_APP_PASSWORD manually in your GitHub repo settings.",
 		);
@@ -120,10 +123,16 @@ async function setSecrets(): Promise<void> {
 			log.info(`Using stored credentials for: ${identifier}`);
 		} else {
 			identifier = exitOnCancel(
-				await text({ message: "ATProto handle (ATP_IDENTIFIER):", placeholder: "you.bsky.social" }),
+				await text({
+					message: "ATProto handle (ATP_IDENTIFIER):",
+					placeholder: "you.bsky.social",
+				}),
 			);
 			appPassword = exitOnCancel(
-				await text({ message: "App Password (ATP_APP_PASSWORD):", placeholder: "xxxx-xxxx-xxxx-xxxx" }),
+				await text({
+					message: "App Password (ATP_APP_PASSWORD):",
+					placeholder: "xxxx-xxxx-xxxx-xxxx",
+				}),
 			);
 		}
 	} else if (storedIds.length > 1) {
@@ -143,10 +152,16 @@ async function setSecrets(): Promise<void> {
 		appPassword = creds.password;
 	} else {
 		identifier = exitOnCancel(
-			await text({ message: "ATProto handle (ATP_IDENTIFIER):", placeholder: "you.bsky.social" }),
+			await text({
+				message: "ATProto handle (ATP_IDENTIFIER):",
+				placeholder: "you.bsky.social",
+			}),
 		);
 		appPassword = exitOnCancel(
-			await text({ message: "App Password (ATP_APP_PASSWORD):", placeholder: "xxxx-xxxx-xxxx-xxxx" }),
+			await text({
+				message: "App Password (ATP_APP_PASSWORD):",
+				placeholder: "xxxx-xxxx-xxxx-xxxx",
+			}),
 		);
 	}
 
@@ -156,7 +171,15 @@ async function setSecrets(): Promise<void> {
 	s.start("Setting ATP_IDENTIFIER secret...");
 	const r1 = spawnSync(
 		"gh",
-		["secret", "set", "ATP_IDENTIFIER", "--body", identifier, "--repo", repoFlag],
+		[
+			"secret",
+			"set",
+			"ATP_IDENTIFIER",
+			"--body",
+			identifier,
+			"--repo",
+			repoFlag,
+		],
 		{ stdio: "pipe" },
 	);
 	if (r1.status === 0) {
@@ -169,7 +192,15 @@ async function setSecrets(): Promise<void> {
 	s.start("Setting ATP_APP_PASSWORD secret...");
 	const r2 = spawnSync(
 		"gh",
-		["secret", "set", "ATP_APP_PASSWORD", "--body", appPassword, "--repo", repoFlag],
+		[
+			"secret",
+			"set",
+			"ATP_APP_PASSWORD",
+			"--body",
+			appPassword,
+			"--repo",
+			repoFlag,
+		],
 		{ stdio: "pipe" },
 	);
 	if (r2.status === 0) {
