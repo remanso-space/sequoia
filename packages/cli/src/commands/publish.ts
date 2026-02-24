@@ -359,6 +359,7 @@ export const publishCommand = command({
 								bskyPostRef = await createBlueskyPost(agent, {
 									title: post.frontmatter.title,
 									description: post.frontmatter.description,
+									bskyPost: post.frontmatter.bskyPost,
 									canonicalUrl,
 									coverImage,
 									publishedAt: post.frontmatter.publishDate,

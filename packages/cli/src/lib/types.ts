@@ -87,6 +87,7 @@ export function isAppPasswordCredentials(
 export interface PostFrontmatter {
 	title: string;
 	description?: string;
+	bskyPost?: string;
 	publishDate: string;
 	tags?: string[];
 	ogImage?: string;

@@ -569,6 +569,7 @@ export async function updatePublication(
 export interface CreateBlueskyPostOptions {
 	title: string;
 	description?: string;
+	bskyPost?: string;
 	canonicalUrl: string;
 	coverImage?: BlobObject;
 	publishedAt: string; // Used as createdAt for the post
@@ -612,19 +613,21 @@ export async function createBlueskyPost(
 	agent: Agent,
 	options: CreateBlueskyPostOptions,
 ): Promise<StrongRef> {
-	const { title, description, canonicalUrl, coverImage, publishedAt } = options;
+	const { title, description, bskyPost, canonicalUrl, coverImage, publishedAt } = options;
 
-	// Build post text: title + description + URL
+	// Build post text: title + description
 	// Max 300 graphemes for Bluesky posts
 	const MAX_GRAPHEMES = 300;
 
 	let postText: string;
-	const urlPart = `\n\n${canonicalUrl}`;
-	const urlGraphemes = countGraphemes(urlPart);
 
-	if (description) {
-		// Try: title + description + URL
-		const fullText = `${title}\n\n${description}${urlPart}`;
+	if (bskyPost) {
+		// Custom bsky post overrides any default behavior
+		postText = bskyPost;
+	}
+	else if (description) {
+		// Try: title + description
+		const fullText = `${title}\n\n${description}`;
 		if (countGraphemes(fullText) <= MAX_GRAPHEMES) {
 			postText = fullText;
 		} else {
@@ -632,52 +635,27 @@ export async function createBlueskyPost(
 			const availableForDesc =
 				MAX_GRAPHEMES -
 				countGraphemes(title) -
-				countGraphemes("\n\n") -
-				urlGraphemes -
 				countGraphemes("\n\n");
 			if (availableForDesc > 10) {
 				const truncatedDesc = truncateToGraphemes(
 					description,
 					availableForDesc,
 				);
-				postText = `${title}\n\n${truncatedDesc}${urlPart}`;
+				postText = `${title}\n\n${truncatedDesc}`;
 			} else {
-				// Just title + URL
-				postText = `${title}${urlPart}`;
+				// Just title
+				postText = `${title}`;
 			}
 		}
 	} else {
-		// Just title + URL
-		postText = `${title}${urlPart}`;
+		// Just title
+		postText = `${title}`;
 	}
 
-	// Final truncation if still too long (shouldn't happen but safety check)
+	// Final truncation in case title or bskyPost are longer than expected
 	if (countGraphemes(postText) > MAX_GRAPHEMES) {
 		postText = truncateToGraphemes(postText, MAX_GRAPHEMES);
 	}
-
-	// Calculate byte indices for the URL facet
-	const encoder = new TextEncoder();
-	const urlStartInText = postText.lastIndexOf(canonicalUrl);
-	const beforeUrl = postText.substring(0, urlStartInText);
-	const byteStart = encoder.encode(beforeUrl).length;
-	const byteEnd = byteStart + encoder.encode(canonicalUrl).length;
-
-	// Build facets for the URL link
-	const facets = [
-		{
-			index: {
-				byteStart,
-				byteEnd,
-			},
-			features: [
-				{
-					$type: "app.bsky.richtext.facet#link",
-					uri: canonicalUrl,
-				},
-			],
-		},
-	];
 
 	// Build external embed
 	const embed: Record<string, unknown> = {
@@ -698,7 +676,6 @@ export async function createBlueskyPost(
 	const record: Record<string, unknown> = {
 		$type: "app.bsky.feed.post",
 		text: postText,
-		facets,
 		embed,
 		createdAt: new Date(publishedAt).toISOString(),
 	};
