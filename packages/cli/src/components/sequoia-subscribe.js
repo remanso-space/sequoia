@@ -12,7 +12,9 @@
  *
  * Attributes:
  *   - publication-uri: Override the publication AT URI (optional)
+ *   - callback-uri: Redirect URI after OAuth authentication (default: "https://sequoia.pub/subscribe")
  *   - label: Button label text (default: "Subscribe on Bluesky")
+ *   - hide: Set to "auto" to hide if no publication URI is detected
  *
  * CSS Custom Properties:
  *   - --sequoia-fg-color: Text color (default: #1f2937)
@@ -262,18 +264,31 @@ class SequoiaSubscribe extends BaseElement {
 
 		this.wrapper = wrapper;
 		this.state = { type: "idle" };
+		this.abortController = null;
 		this.render();
 	}
 
 	static get observedAttributes() {
-		return ["publication-uri", "label"];
+		return ["publication-uri", "callback-uri", "label", "hide"];
+	}
+
+	connectedCallback() {
+		// Pre-check publication availability so hide="auto" can take effect
+		if (!this.publicationUri) {
+			this.checkPublication();
+		}
+	}
+
+	disconnectedCallback() {
+		this.abortController?.abort();
 	}
 
 	attributeChangedCallback() {
 		// Reset to idle if attributes change after an error or success
 		if (
 			this.state.type === "error" ||
-			this.state.type === "subscribed"
+			this.state.type === "subscribed" ||
+			this.state.type === "no-publication"
 		) {
 			this.state = { type: "idle" };
 		}
@@ -284,8 +299,29 @@ class SequoiaSubscribe extends BaseElement {
 		return this.getAttribute("publication-uri") ?? null;
 	}
 
+	get callbackUri() {
+		return this.getAttribute("callback-uri") ?? "https://sequoia.pub/subscribe";
+	}
+
 	get label() {
 		return this.getAttribute("label") ?? "Subscribe on Bluesky";
+	}
+
+	get hide() {
+		const hideAttr = this.getAttribute("hide");
+		return hideAttr === "auto";
+	}
+
+	async checkPublication() {
+		this.abortController?.abort();
+		this.abortController = new AbortController();
+
+		try {
+			await fetchPublicationUri();
+		} catch {
+			this.state = { type: "no-publication" };
+			this.render();
+		}
 	}
 
 	async handleClick() {
@@ -297,17 +333,32 @@ class SequoiaSubscribe extends BaseElement {
 		this.render();
 
 		try {
-			// Resolve the publication AT URI
 			const publicationUri =
 				this.publicationUri ?? (await fetchPublicationUri());
 
-			// TODO: resolve authenticated DID and access token before calling createRecord
-			const { uri: recordUri } = await createRecord(
-				/* did */ undefined,
-				/* accessToken */ undefined,
-				publicationUri,
-			);
+			// POST to the callbackUri (e.g. https://sequoia.pub/subscribe).
+			// If the server reports the user isn't authenticated it returns a
+			// subscribeUrl for the full-page OAuth + subscription flow.
+			const response = await fetch(this.callbackUri, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				credentials: "include",
+				body: JSON.stringify({ publicationUri }),
+			});
 
+			const data = await response.json();
+
+			if (response.status === 401 && data.authenticated === false) {
+				// Redirect to the hosted subscribe page to complete OAuth
+				window.location.href = data.subscribeUrl;
+				return;
+			}
+
+			if (!response.ok) {
+				throw new Error(data.error ?? `HTTP ${response.status}`);
+			}
+
+			const { recordUri } = data;
 			this.state = { type: "subscribed", recordUri, publicationUri };
 			this.render();
 
@@ -319,6 +370,9 @@ class SequoiaSubscribe extends BaseElement {
 				}),
 			);
 		} catch (error) {
+			// Don't overwrite state if we already navigated away
+			if (this.state.type !== "loading") return;
+
 			const message =
 				error instanceof Error ? error.message : "Failed to subscribe";
 			this.state = { type: "error", message };
@@ -336,6 +390,15 @@ class SequoiaSubscribe extends BaseElement {
 
 	render() {
 		const { type } = this.state;
+
+		if (type === "no-publication") {
+			if (this.hide) {
+				this.wrapper.innerHTML = "";
+				this.wrapper.style.display = "none";
+			}
+			return;
+		}
+
 		const isLoading = type === "loading";
 		const isSubscribed = type === "subscribed";
 

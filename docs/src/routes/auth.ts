@@ -4,6 +4,8 @@ import {
 	getSessionDid,
 	setSessionCookie,
 	clearSessionCookie,
+	getReturnToCookie,
+	clearReturnToCookie,
 } from "../lib/session";
 
 interface Env {
@@ -85,7 +87,12 @@ auth.get("/callback", async (c) => {
 		}
 
 		setSessionCookie(c, session.did, c.env.CLIENT_URL);
-		return c.redirect(`${c.env.CLIENT_URL}/`);
+
+		// If a subscribe flow set a return URL before initiating OAuth, honor it
+		const returnTo = getReturnToCookie(c);
+		clearReturnToCookie(c, c.env.CLIENT_URL);
+
+		return c.redirect(returnTo ?? `${c.env.CLIENT_URL}/`);
 	} catch (error) {
 		console.error("Callback error:", error);
 		return c.redirect(`${c.env.CLIENT_URL}/?error=callback_failed`);
