@@ -70,7 +70,6 @@ async function updateConfigFlow(
 	const configSummary = [
 		`Site URL: ${config.siteUrl}`,
 		`Content Dir: ${config.contentDir}`,
-		`Path Prefix: ${config.pathPrefix || "/posts"}`,
 		`Publication URI: ${config.publicationUri}`,
 		config.imagesDir ? `Images Dir: ${config.imagesDir}` : null,
 		config.outputDir ? `Output Dir: ${config.outputDir}` : null,
@@ -89,7 +88,7 @@ async function updateConfigFlow(
 			await select({
 				message: "Select a section to edit:",
 				options: [
-					{ label: "Site settings (siteUrl, pathPrefix)", value: "site" },
+					{ label: "Site settings (siteUrl)", value: "site" },
 					{
 						label:
 							"Directory paths (contentDir, imagesDir, publicDir, outputDir)",
@@ -153,14 +152,12 @@ async function updateConfigFlow(
 			imagesDir: configUpdated.imagesDir,
 			publicDir: configUpdated.publicDir,
 			outputDir: configUpdated.outputDir,
-			pathPrefix: configUpdated.pathPrefix,
 			publicationUri: configUpdated.publicationUri,
 			pdsUrl: configUpdated.pdsUrl,
 			frontmatter: configUpdated.frontmatter,
 			ignore: configUpdated.ignore,
 			removeIndexFromSlug: configUpdated.removeIndexFromSlug,
 			stripDatePrefix: configUpdated.stripDatePrefix,
-			pathTemplate: configUpdated.pathTemplate,
 			textContentField: configUpdated.textContentField,
 			bluesky: configUpdated.bluesky,
 		});
@@ -190,17 +187,9 @@ async function editSiteSettings(
 		}),
 	);
 
-	const pathPrefix = exitOnCancel(
-		await text({
-			message: "URL path prefix for posts:",
-			initialValue: config.pathPrefix || "/posts",
-		}),
-	);
-
 	return {
 		...config,
 		siteUrl,
-		pathPrefix: pathPrefix || undefined,
 	};
 }
 

@@ -197,57 +197,6 @@ export function slugifyTitle(title: string): string {
 		.replace(/[^\w-]/g, "");
 }
 
-export function resolvePathTemplate(template: string, post: BlogPost): string {
-	const publishDate = new Date(post.frontmatter.publishDate);
-	const year = String(publishDate.getFullYear());
-	const yearUTC = String(publishDate.getUTCFullYear());
-	const month = String(publishDate.getMonth() + 1).padStart(2, "0");
-	const monthUTC = String(publishDate.getUTCMonth() + 1).padStart(2, "0");
-	const day = String(publishDate.getDate()).padStart(2, "0");
-	const dayUTC = String(publishDate.getUTCDate()).padStart(2, "0");
-
-	const slugifiedTitle = slugifyTitle(post.frontmatter.title);
-
-	// Replace known tokens
-	let result = template
-		.replace(/\{slug\}/g, post.slug)
-		.replace(/\{year\}/g, year)
-		.replace(/\{yearUTC\}/g, yearUTC)
-		.replace(/\{month\}/g, month)
-		.replace(/\{monthUTC\}/g, monthUTC)
-		.replace(/\{day\}/g, day)
-		.replace(/\{dayUTC\}/g, dayUTC)
-		.replace(/\{title\}/g, slugifiedTitle);
-
-	// Replace any remaining {field} tokens with raw frontmatter values
-	result = result.replace(/\{(\w+)\}/g, (_match, field: string) => {
-		const value = post.rawFrontmatter[field];
-		if (value != null && typeof value === "string") {
-			return value;
-		}
-		return "";
-	});
-
-	// Ensure leading slash
-	if (!result.startsWith("/")) {
-		result = `/${result}`;
-	}
-
-	return result;
-}
-
-export function resolvePostPath(
-	post: BlogPost,
-	pathPrefix?: string,
-	pathTemplate?: string,
-): string {
-	if (pathTemplate) {
-		return resolvePathTemplate(pathTemplate, post);
-	}
-	const prefix = pathPrefix || "/posts";
-	return `${prefix}/${post.slug}`;
-}
-
 export async function getContentHash(content: string): Promise<string> {
 	const encoder = new TextEncoder();
 	const data = encoder.encode(content);

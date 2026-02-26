@@ -76,14 +76,12 @@ export function generateConfigTemplate(options: {
 	imagesDir?: string;
 	publicDir?: string;
 	outputDir?: string;
-	pathPrefix?: string;
 	publicationUri: string;
 	pdsUrl?: string;
 	frontmatter?: FrontmatterMapping;
 	ignore?: string[];
 	removeIndexFromSlug?: boolean;
 	stripDatePrefix?: boolean;
-	pathTemplate?: string;
 	textContentField?: string;
 	bluesky?: BlueskyConfig;
 }): string {
@@ -102,10 +100,6 @@ export function generateConfigTemplate(options: {
 
 	if (options.outputDir) {
 		config.outputDir = options.outputDir;
-	}
-
-	if (options.pathPrefix && options.pathPrefix !== "/posts") {
-		config.pathPrefix = options.pathPrefix;
 	}
 
 	config.publicationUri = options.publicationUri;
@@ -128,10 +122,6 @@ export function generateConfigTemplate(options: {
 
 	if (options.stripDatePrefix) {
 		config.stripDatePrefix = options.stripDatePrefix;
-	}
-
-	if (options.pathTemplate) {
-		config.pathTemplate = options.pathTemplate;
 	}
 
 	if (options.textContentField) {
