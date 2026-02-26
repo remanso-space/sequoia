@@ -28,9 +28,9 @@ Hello world`;
 
 	test("parses TOML frontmatter with +++ delimiters", () => {
 		const content = `+++
-title = My Post
-description = A description
-date = 2024-01-15
+title = "My Post"
+description = "A description"
+date = "2024-01-15"
 +++
 Body content`;
 

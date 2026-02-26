@@ -33,11 +33,11 @@ Body content here.`;
 			expect(body).toBe("Body content here.");
 		});
 
-		it("throws when no frontmatter is present", () => {
+		it("returns defaults when no frontmatter is present", () => {
 			const content = "Just plain content with no frontmatter.";
-			expect(() => parseFrontmatter(content)).toThrow(
-				"Could not parse frontmatter",
-			);
+			const { frontmatter, body } = parseFrontmatter(content);
+			expect(frontmatter.title).toBe("");
+			expect(body).toBe(content);
 		});
 	});
 
