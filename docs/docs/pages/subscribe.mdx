@@ -1,0 +1,191 @@
+# Subscribe
+
+Sequoia provides a subscribe button web component that lets your readers subscribe to your publication directly from your site using their Bluesky account.
+
+## Setup
+
+Run the following command in your project to install the subscribe web component. It will ask you where you would like to store the component file.
+
+```bash [Terminal]
+sequoia add sequoia-subscribe
+```
+
+The component will look for your publication AT URI from your site's `/.well-known/site.standard.publication` endpoint automatically, so no additional configuration is required for most setups.
+
+## Usage
+
+Since `sequoia-subscribe` is a standard Web Component, it works with any framework. Choose your setup below:
+
+:::code-group
+
+```html [HTML]
+<body>
+  <h1>My Publication</h1>
+  <!--Content-->
+
+  <sequoia-subscribe></sequoia-subscribe>
+  <script type="module" src="./src/components/sequoia-subscribe.js"></script>
+</body>
+```
+
+```tsx [React]
+// Import the component (registers the custom element)
+import './components/sequoia-subscribe.js';
+
+function HomePage() {
+  return (
+    <main>
+      <h1>My Publication</h1>
+      {/* Content */}
+      <sequoia-subscribe />
+    </main>
+  );
+}
+```
+
+```vue [Vue]
+<script setup>
+import './components/sequoia-subscribe.js';
+</script>
+
+<template>
+  <main>
+    <h1>My Publication</h1>
+    <!-- Content -->
+    <sequoia-subscribe />
+  </main>
+</template>
+```
+
+```svelte [Svelte]
+<script>
+  import './components/sequoia-subscribe.js';
+</script>
+
+<main>
+  <h1>My Publication</h1>
+  <!-- Content -->
+  <sequoia-subscribe />
+</main>
+```
+
+```astro [Astro]
+<main>
+  <h1>My Publication</h1>
+  <!-- Content -->
+  <sequoia-subscribe />
+  <script>
+    import './components/sequoia-subscribe.js';
+  </script>
+</main>
+```
+
+:::
+
+### TypeScript Support
+
+If you're using TypeScript with React, add this type declaration to avoid JSX errors:
+
+```ts [custom-elements.d.ts]
+declare namespace JSX {
+  interface IntrinsicElements {
+    'sequoia-subscribe': React.DetailedHTMLProps<
+      React.HTMLAttributes<HTMLElement> & {
+        'publication-uri'?: string;
+        'callback-uri'?: string;
+        label?: string;
+        hide?: string;
+      },
+      HTMLElement
+    >;
+  }
+}
+```
+
+### Vue Configuration
+
+For Vue, you may need to configure the compiler to recognize custom elements:
+
+```ts [vite.config.ts]
+export default defineConfig({
+  plugins: [
+    vue({
+      template: {
+        compilerOptions: {
+          isCustomElement: (tag) => tag === 'sequoia-subscribe'
+        }
+      }
+    })
+  ]
+});
+```
+
+## Configuration
+
+The subscribe web component has several configuration options available.
+
+### Attributes
+
+The `<sequoia-subscribe>` component accepts the following attributes:
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `publication-uri` | `string` | - | AT Protocol URI for the publication. Optional if a `/.well-known/site.standard.publication` endpoint exists on the host site. |
+| `callback-uri` | `string` | `https://sequoia.pub/subscribe` | Redirect URI used for the OAuth authentication flow. |
+| `label` | `string` | `Subscribe on Bluesky` | Button label text. |
+| `hide` | `string` | - | Set to `"auto"` to hide the component if no publication URI is detected. |
+
+```html
+<!-- Use attributes for explicit control -->
+<sequoia-subscribe
+  publication-uri="at://did:plc:example/site.standard.publication/abc123"
+  label="Follow on Bluesky">
+</sequoia-subscribe>
+```
+
+### Events
+
+The component dispatches custom events you can listen to:
+
+| Event | Description | `detail` |
+|-------|-------------|----------|
+| `sequoia-subscribed` | Fired when the subscription is created successfully. | `{ publicationUri: string, recordUri: string }` |
+| `sequoia-subscribe-error` | Fired when the subscription fails. | `{ message: string }` |
+
+```js
+const btn = document.querySelector('sequoia-subscribe');
+
+btn.addEventListener('sequoia-subscribed', (e) => {
+  console.log('Subscribed!', e.detail.recordUri);
+});
+
+btn.addEventListener('sequoia-subscribe-error', (e) => {
+  console.error('Subscription failed:', e.detail.message);
+});
+```
+
+### Styling
+
+The component uses CSS custom properties for theming. Set these in your `:root` or parent element to customize the appearance:
+
+| CSS Property | Default | Description |
+|--------------|---------|-------------|
+| `--sequoia-fg-color` | `#1f2937` | Text color |
+| `--sequoia-bg-color` | `#ffffff` | Background color |
+| `--sequoia-border-color` | `#e5e7eb` | Border color |
+| `--sequoia-accent-color` | `#2563eb` | Button background color |
+| `--sequoia-secondary-color` | `#6b7280` | Secondary text color |
+| `--sequoia-border-radius` | `8px` | Border radius for the button |
+
+### Example: Match Site Theme
+
+```css
+:root {
+  --sequoia-accent-color: #3A5A40;
+  --sequoia-border-radius: 6px;
+  --sequoia-bg-color: #F5F3EF;
+  --sequoia-fg-color: #2C2C2C;
+  --sequoia-border-color: #D5D1C8;
+  --sequoia-secondary-color: #8B7355;
+}
+```
