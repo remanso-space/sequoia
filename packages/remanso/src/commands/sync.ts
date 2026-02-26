@@ -60,13 +60,16 @@ async function matchesPDS(
 				rkey,
 			});
 			const noteValue = noteResponse.data.value as Record<string, unknown>;
+			const localDiscoverable = localPost.frontmatter.discoverable ?? true;
+			const noteDiscoverable = (noteValue.discoverable as boolean | undefined) ?? true;
 			if (
 				(localPost.frontmatter.theme || undefined) !==
 					(noteValue.theme as string | undefined) ||
 				(localPost.frontmatter.fontSize || undefined) !==
 					(noteValue.fontSize as number | undefined) ||
 				(localPost.frontmatter.fontFamily || undefined) !==
-					(noteValue.fontFamily as string | undefined)
+					(noteValue.fontFamily as string | undefined) ||
+				localDiscoverable !== noteDiscoverable
 			) {
 				return false;
 			}

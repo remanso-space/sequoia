@@ -96,6 +96,7 @@ export interface PostFrontmatter {
 	ogImage?: string;
 	atUri?: string;
 	draft?: boolean;
+	discoverable?: boolean;
 }
 
 export interface BlogPost {
