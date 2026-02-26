@@ -215,18 +215,15 @@ function renderHandleForm(publicationUri: string, styleHref: string, error?: str
 		<p class="vocs_Paragraph">Enter your Bluesky handle to subscribe to this publication.</p>
 		${errorHtml}
 		<form method="POST" action="/subscribe/login">
-			<input type="hidden" name="publicationUri" value="${escapeHtml(publicationUri)}" />
-			<label>
-				Bluesky handle
-				<input
-					type="text"
-					name="handle"
-					placeholder="you.bsky.social"
-					autocomplete="username"
-					required
-					autofocus
-				/>
-			</label>
+		<input type="hidden" name="publicationUri" value="${escapeHtml(publicationUri)}" />
+			<input
+				type="text"
+				name="handle"
+				placeholder="you.bsky.social"
+				autocomplete="username"
+				required
+				autofocus
+			/>
 			<button type="submit" class="vocs_Button_button vocs_Button_button_accent">Continue on Bluesky</button>
 		</form>
 	`, styleHref);
@@ -241,11 +238,13 @@ function renderSuccess(
 	const msg = existing
 		? "You're already subscribed to this publication."
 		: "You've successfully subscribed!";
+	const escapedPublicationUri = escapeHtml(publicationUri);
+	const escapedRecordUri = escapeHtml(recordUri);
 	return page(`
 		<h1 class="vocs_H1 vocs_Heading">Subscribed ✓</h1>
 		<p class="vocs_Paragraph">${msg}</p>
-		<p class="vocs_Paragraph"><small>Publication: <code class="vocs_Code">${escapeHtml(publicationUri)}</code></small></p>
-		<p class="vocs_Paragraph"><small>Record: <code class="vocs_Code">${escapeHtml(recordUri)}</code></small></p>
+		<p class="vocs_Paragraph"><small>Publication: <code class="vocs_Code"><a href="https://pds.ls/${escapedPublicationUri}">${escapedPublicationUri}</a></code></small></p>
+		<p class="vocs_Paragraph"><small>Record: <code class="vocs_Code"><a href="https://pds.ls/${escapedRecordUri}">${escapedRecordUri}</a></code></small></p>
 	`, styleHref);
 }
 
@@ -264,24 +263,19 @@ function page(body: string, styleHref: string): string {
   <script>if(window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.classList.add('dark')</script>
   <style>
     .page-container {
-      max-width: 480px;
+      max-width: calc(var(--vocs-content_width, 480px) / 1.6);
       margin: 4rem auto;
       padding: 0 var(--vocs-space_20, 1.25rem);
     }
     .vocs_Heading { margin-bottom: var(--vocs-space_12, .75rem); }
     .vocs_Paragraph { margin-bottom: var(--vocs-space_16, 1rem); }
-    label {
-      display: flex;
-      flex-direction: column;
-      gap: var(--vocs-space_6, .375rem);
-      margin-bottom: var(--vocs-space_20, 1.25rem);
-      font-weight: var(--vocs-fontWeight_medium, 400);
-      font-size: var(--vocs-fontSize_15, .9375rem);
-    }
     input[type="text"] {
       padding: var(--vocs-space_8, .5rem) var(--vocs-space_12, .75rem);
       border: 1px solid var(--vocs-color_border, #D5D1C8);
       border-radius: var(--vocs-borderRadius_6, 6px);
+      margin-bottom: var(--vocs-space_20, 1.25rem);
+	  min-width: 30vh;
+	  width: 100%;
       font-size: var(--vocs-fontSize_16, 1rem);
       font-family: inherit;
       background: var(--vocs-color_background, #F5F3EF);
