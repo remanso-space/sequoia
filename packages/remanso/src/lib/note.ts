@@ -226,6 +226,8 @@ async function buildNoteRecord(
 		record.fontFamily = post.frontmatter.fontFamily;
 	}
 
+	record.discoverable = post.frontmatter.discoverable ?? true;
+
 	return record;
 }
 

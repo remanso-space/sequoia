@@ -109,6 +109,14 @@ export function parseFrontmatter(
 		frontmatter.draft = draftValue === true || draftValue === "true";
 	}
 
+	// Discoverable mapping (defaults to true if not set or invalid)
+	const discoverableValue = raw.discoverable;
+	if (discoverableValue === false || discoverableValue === "false") {
+		frontmatter.discoverable = false;
+	} else {
+		frontmatter.discoverable = true;
+	}
+
 	// Always preserve atUri (internal field)
 	frontmatter.atUri = raw.atUri;
 
