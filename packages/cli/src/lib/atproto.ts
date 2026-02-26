@@ -282,7 +282,8 @@ export async function createDocument(
 	const parsed = parseAtUri(atUri);
 
 	if (parsed) {
-		const finalPath = `/pub/${parsed.rkey}/${post.slug}`;
+		const slugName = post.slug.split("/").pop()!.replace(/\.pub$/, "");
+		const finalPath = `/pub/${parsed.rkey}/${slugName}`;
 		record.path = finalPath;
 		record.canonicalUrl = config.canonicalUrlBuilder
 			? config.canonicalUrlBuilder(atUri, post)
@@ -314,7 +315,8 @@ export async function updateDocument(
 
 	const [, , collection, rkey] = uriMatch;
 
-	const finalPath = `/pub/${rkey}/${post.slug}`;
+	const slugName = post.slug.split("/").pop()!.replace(/\.pub$/, "");
+	const finalPath = `/pub/${rkey}/${slugName}`;
 	const publishDate = new Date(post.frontmatter.publishDate);
 	const trimmedContent = post.content.trim();
 	const textContent = getTextContent(post, config.textContentField);
