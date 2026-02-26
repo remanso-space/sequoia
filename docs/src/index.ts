@@ -1,6 +1,8 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import auth from "./routes/auth";
 import subscribe from "./routes/subscribe";
+import "./lib/path-redirect";
 
 type Bindings = {
 	ASSETS: Fetcher;
@@ -12,6 +14,14 @@ const app = new Hono<{ Bindings: Bindings }>();
 
 app.route("/oauth", auth);
 app.route("/subscribe", subscribe);
+app.use("/subscribe", cors({
+	origin: (origin) => origin,
+	credentials: true,
+}));
+app.use("/subscribe/*", cors({
+	origin: (origin) => origin,
+	credentials: true,
+}));
 
 app.get("/api/health", (c) => {
 	return c.json({ status: "ok" });
