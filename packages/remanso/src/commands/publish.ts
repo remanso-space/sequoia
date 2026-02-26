@@ -22,7 +22,6 @@ import {
 	scanContentDirectory,
 	getContentHash,
 	updateFrontmatterWithAtUri,
-	resolvePostPath,
 	slugifyTitle,
 } from "../../../cli/src/lib/markdown";
 import type {
