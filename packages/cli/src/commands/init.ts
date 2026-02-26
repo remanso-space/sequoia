@@ -85,11 +85,6 @@ export const initCommand = command({
 						message: "Build output directory (for link tag injection):",
 						placeholder: "./dist",
 					}),
-				pathPrefix: () =>
-					text({
-						message: "URL path prefix for posts:",
-						placeholder: "/posts, /blog, /articles, etc.",
-					}),
 			},
 			{ onCancel },
 		);
@@ -328,7 +323,6 @@ export const initCommand = command({
 			imagesDir: siteConfig.imagesDir || undefined,
 			publicDir: siteConfig.publicDir || "./public",
 			outputDir: siteConfig.outputDir || "./dist",
-			pathPrefix: siteConfig.pathPrefix || "/posts",
 			publicationUri,
 			pdsUrl,
 			frontmatter: frontmatterMapping,

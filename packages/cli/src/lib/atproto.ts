@@ -2,7 +2,7 @@ import { Agent, AtpAgent } from "@atproto/api";
 import * as mimeTypes from "mime-types";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { getTextContent, resolvePostPath } from "./markdown";
+import { getTextContent } from "./markdown";
 import { getOAuthClient } from "./oauth-client";
 import type {
 	BlobObject,
@@ -245,11 +245,6 @@ export async function createDocument(
 	config: PublisherConfig,
 	coverImage?: BlobObject,
 ): Promise<string> {
-	const postPath = resolvePostPath(
-		post,
-		config.pathPrefix,
-		config.pathTemplate,
-	);
 	const publishDate = new Date(post.frontmatter.publishDate);
 	const trimmedContent = post.content.trim();
 	const textContent = getTextContent(post, config.textContentField);
@@ -260,14 +255,10 @@ export async function createDocument(
 		$type: "site.standard.document",
 		title,
 		site: config.publicationUri,
-		path: postPath,
+		path: `/${post.slug}`,
 		textContent: textContent.slice(0, 10000),
 		publishedAt: publishDate.toISOString(),
 	};
-
-	if (!config.canonicalUrlBuilder) {
-		record.canonicalUrl = `${config.siteUrl}${postPath}`;
-	}
 
 	if (post.frontmatter.description) {
 		record.description = post.frontmatter.description;
@@ -288,18 +279,20 @@ export async function createDocument(
 	});
 
 	const atUri = response.data.uri;
+	const parsed = parseAtUri(atUri);
 
-	if (config.canonicalUrlBuilder) {
-		const parsed = parseAtUri(atUri);
-		if (parsed) {
-			record.canonicalUrl = config.canonicalUrlBuilder(atUri, post);
-			await agent.com.atproto.repo.putRecord({
-				repo: agent.did!,
-				collection: parsed.collection,
-				rkey: parsed.rkey,
-				record,
-			});
-		}
+	if (parsed) {
+		const finalPath = `/pub/${parsed.rkey}/${post.slug}`;
+		record.path = finalPath;
+		record.canonicalUrl = config.canonicalUrlBuilder
+			? config.canonicalUrlBuilder(atUri, post)
+			: `${config.siteUrl}${finalPath}`;
+		await agent.com.atproto.repo.putRecord({
+			repo: agent.did!,
+			collection: parsed.collection,
+			rkey: parsed.rkey,
+			record,
+		});
 	}
 
 	return atUri;
@@ -321,11 +314,7 @@ export async function updateDocument(
 
 	const [, , collection, rkey] = uriMatch;
 
-	const postPath = resolvePostPath(
-		post,
-		config.pathPrefix,
-		config.pathTemplate,
-	);
+	const finalPath = `/pub/${rkey}/${post.slug}`;
 	const publishDate = new Date(post.frontmatter.publishDate);
 	const trimmedContent = post.content.trim();
 	const textContent = getTextContent(post, config.textContentField);
@@ -336,12 +325,12 @@ export async function updateDocument(
 		$type: "site.standard.document",
 		title,
 		site: config.publicationUri,
-		path: postPath,
+		path: finalPath,
 		textContent: textContent.slice(0, 10000),
 		publishedAt: publishDate.toISOString(),
 		canonicalUrl: config.canonicalUrlBuilder
 			? config.canonicalUrlBuilder(atUri, post)
-			: `${config.siteUrl}${postPath}`,
+			: `${config.siteUrl}${finalPath}`,
 	};
 
 	if (post.frontmatter.description) {

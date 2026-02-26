@@ -31,7 +31,6 @@ export interface PublisherConfig {
 	imagesDir?: string; // Directory containing cover images
 	publicDir?: string; // Static/public folder for .well-known files (default: public)
 	outputDir?: string; // Built output directory for inject command
-	pathPrefix?: string; // URL path prefix for posts (default: /posts)
 	publicationUri: string;
 	pdsUrl?: string;
 	identity?: string; // Which stored identity to use (matches identifier)
@@ -39,7 +38,6 @@ export interface PublisherConfig {
 	ignore?: string[]; // Glob patterns for files to ignore (e.g., ["_index.md", "**/drafts/**"])
 	removeIndexFromSlug?: boolean; // Remove "/index" or "/_index" suffix from paths (default: false)
 	stripDatePrefix?: boolean; // Remove YYYY-MM-DD- prefix from filenames (Jekyll-style, default: false)
-	pathTemplate?: string; // URL path template with tokens like {year}/{month}/{day}/{slug} (overrides pathPrefix + slug)
 	textContentField?: string; // Frontmatter field to use for textContent instead of markdown body
 	canonicalUrlBuilder?: (atUri: string, post: BlogPost) => string;
 	bluesky?: BlueskyConfig; // Optional Bluesky posting configuration

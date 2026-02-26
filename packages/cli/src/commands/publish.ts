@@ -19,12 +19,12 @@ import {
 	addBskyPostRefToDocument,
 	deleteRecord,
 	listDocuments,
+	parseAtUri,
 } from "../lib/atproto";
 import {
 	scanContentDirectory,
 	getContentHash,
 	updateFrontmatterWithAtUri,
-	resolvePostPath,
 } from "../lib/markdown";
 import type { BlogPost, BlobObject, StrongRef } from "../lib/types";
 import { exitOnCancel } from "../lib/prompts";
@@ -260,14 +260,14 @@ export const publishCommand = command({
 			const pdsDocuments = await listDocuments(ag, config.publicationUri);
 			s.stop(`Found ${pdsDocuments.length} documents on PDS`);
 
-			const pathPrefix = config.pathPrefix || "/posts";
-			const postsByPath = new Map<string, BlogPost>();
-			for (const post of posts) {
-				postsByPath.set(`${pathPrefix}/${post.slug}`, post);
-			}
+			const knownAtUris = new Set(
+				posts
+					.map((p) => p.frontmatter.atUri)
+					.filter((uri): uri is string => uri != null),
+			);
 			const deletedAtUris = new Set(deletedEntries.map((e) => e.atUri));
 			for (const doc of pdsDocuments) {
-				if (!postsByPath.has(doc.value.path) && !deletedAtUris.has(doc.uri)) {
+				if (!knownAtUris.has(doc.uri) && !deletedAtUris.has(doc.uri)) {
 					unmatchedEntries.push({
 						atUri: doc.uri,
 						title: doc.value.title || doc.value.path,
@@ -313,17 +313,8 @@ export const publishCommand = command({
 					}
 				}
 
-				let postUrl = "";
-				if (verbose) {
-					const postPath = resolvePostPath(
-						post,
-						config.pathPrefix,
-						config.pathTemplate,
-					);
-					postUrl = `\n ${config.siteUrl}${postPath}`;
-				}
 				log.message(
-					`  ${icon} ${post.filePath} (${reason})${bskyNote}${postUrl}`,
+					`  ${icon} ${post.filePath} (${reason})${bskyNote}`,
 				);
 			}
 		}
@@ -455,7 +446,10 @@ export const publishCommand = command({
 						} else {
 							// Create Bluesky post
 							try {
-								const canonicalUrl = `${config.siteUrl}${resolvePostPath(post, config.pathPrefix, config.pathTemplate)}`;
+								const parsedUri = parseAtUri(atUri);
+								const canonicalUrl = parsedUri
+									? `${config.siteUrl}/pub/${parsedUri.rkey}/${post.slug}`
+									: config.siteUrl;
 
 								bskyPostRef = await createBlueskyPost(agent, {
 									title: post.frontmatter.title,

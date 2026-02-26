@@ -18,7 +18,6 @@ import {
 	getContentHash,
 	getTextContent,
 	updateFrontmatterWithAtUri,
-	resolvePostPath,
 } from "../lib/markdown";
 import { exitOnCancel } from "../lib/prompts";
 
@@ -212,16 +211,12 @@ export const syncCommand = command({
 		});
 		s.stop(`Found ${localPosts.length} local posts`);
 
-		// Build a map of path -> local post for matching
-		// Document path is like /posts/my-post-slug (or custom pathPrefix/pathTemplate)
-		const postsByPath = new Map<string, (typeof localPosts)[0]>();
+		// Build a map of atUri -> local post for matching
+		const postsByAtUri = new Map<string, (typeof localPosts)[0]>();
 		for (const post of localPosts) {
-			const postPath = resolvePostPath(
-				post,
-				config.pathPrefix,
-				config.pathTemplate,
-			);
-			postsByPath.set(postPath, post);
+			if (post.frontmatter.atUri) {
+				postsByAtUri.set(post.frontmatter.atUri, post);
+			}
 		}
 
 		// Load existing state
@@ -236,13 +231,12 @@ export const syncCommand = command({
 		log.message("\nMatching documents to local files:\n");
 
 		for (const doc of documents) {
-			const docPath = doc.value.path;
-			const localPost = postsByPath.get(docPath);
+			const localPost = postsByAtUri.get(doc.uri);
 
 			if (localPost) {
 				matchedCount++;
 				log.message(`  ✓ ${doc.value.title}`);
-				log.message(`    Path: ${docPath}`);
+				log.message(`    Path: ${doc.value.path}`);
 				log.message(`    URI: ${doc.uri}`);
 				log.message(`    File: ${path.basename(localPost.filePath)}`);
 
@@ -275,7 +269,7 @@ export const syncCommand = command({
 			} else {
 				unmatchedCount++;
 				log.message(`  ✗ ${doc.value.title} (no matching local file)`);
-				log.message(`    Path: ${docPath}`);
+				log.message(`    Path: ${doc.value.path}`);
 				log.message(`    URI: ${doc.uri}`);
 			}
 			log.message("");
