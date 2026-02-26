@@ -254,14 +254,14 @@ export const publishCommand = command({
 			const pdsDocuments = await listDocuments(ag, config.publicationUri);
 			s.stop(`Found ${pdsDocuments.length} documents on PDS`);
 
-			const pathPrefix = "/posts";
-			const postsByPath = new Map<string, BlogPost>();
-			for (const post of posts) {
-				postsByPath.set(`${pathPrefix}/${post.slug}`, post);
-			}
+			const knownAtUris = new Set(
+				posts
+					.map((p) => p.frontmatter.atUri)
+					.filter((uri): uri is string => uri != null),
+			);
 			const deletedAtUris = new Set(deletedEntries.map((e) => e.atUri));
 			for (const doc of pdsDocuments) {
-				if (!postsByPath.has(doc.value.path) && !deletedAtUris.has(doc.uri)) {
+				if (!knownAtUris.has(doc.uri) && !deletedAtUris.has(doc.uri)) {
 					unmatchedEntries.push({
 						atUri: doc.uri,
 						title: doc.value.title || doc.value.path,
