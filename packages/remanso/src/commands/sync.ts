@@ -204,12 +204,12 @@ export const syncCommand = command({
 		);
 		s.stop(`Found ${localPosts.length} publishable notes (.pub.md)`);
 
-		// Build a map of path -> local post for matching
-		// Use "/posts" prefix (same default as publish command)
-		const pathPrefix = "/posts";
-		const postsByPath = new Map<string, (typeof localPosts)[0]>();
+		// Build a map from atUri -> local post for matching
+		const postsByAtUri = new Map<string, (typeof localPosts)[0]>();
 		for (const post of localPosts) {
-			postsByPath.set(`${pathPrefix}/${post.slug}`, post);
+			if (post.frontmatter.atUri) {
+				postsByAtUri.set(post.frontmatter.atUri, post);
+			}
 		}
 
 		// Load existing state
@@ -225,7 +225,7 @@ export const syncCommand = command({
 
 		for (const doc of documents) {
 			const docPath = doc.value.path;
-			const localPost = postsByPath.get(docPath);
+			const localPost = postsByAtUri.get(doc.uri);
 
 			if (localPost) {
 				matchedCount++;
