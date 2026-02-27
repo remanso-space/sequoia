@@ -1,3 +1,23 @@
+## [0.5.0] - 2026-02-27
+
+### 🚀 Features
+
+- Added slug templating
+- Add subscription component
+
+### 🐛 Bug Fixes
+
+- Preserve PDS-side fields (e.g. bskyPostRef) on document update
+
+### ⚙️ Miscellaneous Tasks
+
+- Updated docs
+- Misc updates
+- Lint and format
+- Refactored docs to worker + static assets
+- Refactored to use atproto oauth lib
+- Version bump and clean up
+
 ## [0.4.0] - 2026-02-07
 
 ### 🚀 Features
@@ -13,7 +33,7 @@
 - Update docs
 - Updated comments
 - Lint
-
+- Release 0.4.0
 ## [0.3.3] - 2026-02-05
 
 ### ⚙️ Miscellaneous Tasks
