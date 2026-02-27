@@ -35,6 +35,7 @@ async function getVocsStyleHref(
 const subscribe = new Hono<{ Bindings: Env }>();
 
 const COLLECTION = "site.standard.graph.subscription";
+const REDIRECT_DELAY_SECONDS = 5;
 
 // ============================================================================
 // Helpers
@@ -162,9 +163,16 @@ subscribe.get("/", async (c) => {
 		);
 	}
 
+	// Prefer an explicit returnTo query param (survives the OAuth round-trip);
+	// fall back to the Referer header on the first visit, ignoring self-referrals.
+	const referer = c.req.header("referer");
+	const returnTo =
+		c.req.query("returnTo") ??
+		(referer && !referer.includes("/subscribe") ? referer : undefined);
+
 	const did = getSessionDid(c);
 	if (!did) {
-		return c.html(renderHandleForm(publicationUri, styleHref));
+		return c.html(renderHandleForm(publicationUri, styleHref, returnTo));
 	}
 
 	try {
@@ -179,7 +187,7 @@ subscribe.get("/", async (c) => {
 		);
 		if (existingUri) {
 			return c.html(
-				renderSuccess(publicationUri, existingUri, true, styleHref),
+				renderSuccess(publicationUri, existingUri, true, styleHref, returnTo),
 			);
 		}
 
@@ -193,7 +201,13 @@ subscribe.get("/", async (c) => {
 		});
 
 		return c.html(
-			renderSuccess(publicationUri, result.data.uri, false, styleHref),
+			renderSuccess(
+				publicationUri,
+				result.data.uri,
+				false,
+				styleHref,
+				returnTo,
+			),
 		);
 	} catch (error) {
 		console.error("Subscribe GET error:", error);
@@ -202,6 +216,7 @@ subscribe.get("/", async (c) => {
 			renderHandleForm(
 				publicationUri,
 				styleHref,
+				returnTo,
 				"Session expired. Please sign in again.",
 			),
 		);
@@ -219,6 +234,7 @@ subscribe.post("/login", async (c) => {
 	const body = await c.req.parseBody();
 	const handle = (body["handle"] as string | undefined)?.trim();
 	const publicationUri = body["publicationUri"] as string | undefined;
+	const formReturnTo = (body["returnTo"] as string | undefined) || undefined;
 
 	if (!handle || !publicationUri) {
 		const styleHref = await getVocsStyleHref(c.env.ASSETS, c.req.url);
@@ -228,7 +244,9 @@ subscribe.post("/login", async (c) => {
 		);
 	}
 
-	const returnTo = `${c.env.CLIENT_URL}/subscribe?publicationUri=${encodeURIComponent(publicationUri)}`;
+	const returnTo =
+		`${c.env.CLIENT_URL}/subscribe?publicationUri=${encodeURIComponent(publicationUri)}` +
+		(formReturnTo ? `&returnTo=${encodeURIComponent(formReturnTo)}` : "");
 	setReturnToCookie(c, returnTo, c.env.CLIENT_URL);
 
 	return c.redirect(
@@ -243,10 +261,14 @@ subscribe.post("/login", async (c) => {
 function renderHandleForm(
 	publicationUri: string,
 	styleHref: string,
+	returnTo?: string,
 	error?: string,
 ): string {
 	const errorHtml = error
 		? `<p class="vocs_Paragraph error">${escapeHtml(error)}</p>`
+		: "";
+	const returnToInput = returnTo
+		? `<input type="hidden" name="returnTo" value="${escapeHtml(returnTo)}" />`
 		: "";
 
 	return page(
@@ -255,7 +277,8 @@ function renderHandleForm(
 		<p class="vocs_Paragraph">Enter your Bluesky handle to subscribe to this publication.</p>
 		${errorHtml}
 		<form method="POST" action="/subscribe/login">
-		<input type="hidden" name="publicationUri" value="${escapeHtml(publicationUri)}" />
+			<input type="hidden" name="publicationUri" value="${escapeHtml(publicationUri)}" />
+			${returnToInput}
 			<input
 				type="text"
 				name="handle"
@@ -276,20 +299,57 @@ function renderSuccess(
 	recordUri: string,
 	existing: boolean,
 	styleHref: string,
+	returnTo?: string,
 ): string {
 	const msg = existing
 		? "You're already subscribed to this publication."
 		: "You've successfully subscribed!";
 	const escapedPublicationUri = escapeHtml(publicationUri);
 	const escapedRecordUri = escapeHtml(recordUri);
+
+	const redirectHtml = returnTo
+		? `<p class="vocs_Paragraph" id="redirect-msg">Redirecting to <a class="vocs_Anchor" href="${escapeHtml(returnTo)}">${escapeHtml(returnTo)}</a> in <span id="countdown">${REDIRECT_DELAY_SECONDS}</span>\u00a0seconds\u2026</p>
+		<script>
+		(function(){
+			var secs = ${REDIRECT_DELAY_SECONDS};
+			var el = document.getElementById('countdown');
+			var iv = setInterval(function(){
+				secs--;
+				if (el) el.textContent = String(secs);
+				if (secs <= 0) { clearInterval(iv); location.href = ${JSON.stringify(returnTo)}; }
+			}, 1000);
+		})();
+		</script>`
+		: "";
+	const headExtra = returnTo
+		? `<meta http-equiv="refresh" content="${REDIRECT_DELAY_SECONDS};url=${escapeHtml(returnTo)}" />`
+		: "";
+
 	return page(
 		`
 		<h1 class="vocs_H1 vocs_Heading">Subscribed ✓</h1>
 		<p class="vocs_Paragraph">${msg}</p>
-		<p class="vocs_Paragraph"><small>Publication: <code class="vocs_Code"><a href="https://pds.ls/${escapedPublicationUri}">${escapedPublicationUri}</a></code></small></p>
-		<p class="vocs_Paragraph"><small>Record: <code class="vocs_Code"><a href="https://pds.ls/${escapedRecordUri}">${escapedRecordUri}</a></code></small></p>
+		${redirectHtml}
+		<table class="vocs_Table" style="display:table;table-layout:fixed;width:100%;overflow:hidden;">
+			<colgroup><col style="width:7rem;"><col></colgroup>
+			<tbody>
+				<tr class="vocs_TableRow">
+					<td class="vocs_TableCell">Publication</td>
+					<td class="vocs_TableCell" style="overflow:hidden;">
+						<div style="overflow-x:auto;white-space:nowrap;"><code class="vocs_Code"><a href="https://pds.ls/${escapedPublicationUri}">${escapedPublicationUri}</a></code></div>
+					</td>
+				</tr>
+				<tr class="vocs_TableRow">
+					<td class="vocs_TableCell">Record</td>
+					<td class="vocs_TableCell" style="overflow:hidden;">
+						<div style="overflow-x:auto;white-space:nowrap;"><code class="vocs_Code"><a href="https://pds.ls/${escapedRecordUri}">${escapedRecordUri}</a></code></div>
+					</td>
+				</tr>
+			</tbody>
+		</table>
 	`,
 		styleHref,
+		headExtra,
 	);
 }
 
@@ -300,7 +360,7 @@ function renderError(message: string, styleHref: string): string {
 	);
 }
 
-function page(body: string, styleHref: string): string {
+function page(body: string, styleHref: string, headExtra = ""): string {
 	return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -309,6 +369,7 @@ function page(body: string, styleHref: string): string {
   <title>Sequoia · Subscribe</title>
   <link rel="stylesheet" href="${styleHref}" />
   <script>if(window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.classList.add('dark')</script>
+  ${headExtra}
   <style>
     .page-container {
       max-width: calc(var(--vocs-content_width, 480px) / 1.6);
