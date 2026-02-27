@@ -12,16 +12,23 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>();
 
+app.use(
+	"/subscribe",
+	cors({
+		origin: (origin) => origin,
+		credentials: true,
+	}),
+);
+app.use(
+	"/subscribe/*",
+	cors({
+		origin: (origin) => origin,
+		credentials: true,
+	}),
+);
+
 app.route("/oauth", auth);
 app.route("/subscribe", subscribe);
-app.use("/subscribe", cors({
-	origin: (origin) => origin,
-	credentials: true,
-}));
-app.use("/subscribe/*", cors({
-	origin: (origin) => origin,
-	credentials: true,
-}));
 
 app.get("/api/health", (c) => {
 	return c.json({ status: "ok" });

@@ -12,7 +12,10 @@ interface Env {
 // Cache the vocs-generated stylesheet href across requests (changes on rebuild).
 let _vocsStyleHref: string | null = null;
 
-async function getVocsStyleHref(assets: Fetcher, baseUrl: string): Promise<string> {
+async function getVocsStyleHref(
+	assets: Fetcher,
+	baseUrl: string,
+): Promise<string> {
 	if (_vocsStyleHref) return _vocsStyleHref;
 	try {
 		const indexUrl = new URL("/", baseUrl).toString();
@@ -105,9 +108,17 @@ subscribe.post("/", async (c) => {
 		const session = await client.restore(did);
 		const agent = new Agent(session);
 
-		const existingUri = await findExistingSubscription(agent, did, publicationUri);
+		const existingUri = await findExistingSubscription(
+			agent,
+			did,
+			publicationUri,
+		);
 		if (existingUri) {
-			return c.json({ subscribed: true, existing: true, recordUri: existingUri });
+			return c.json({
+				subscribed: true,
+				existing: true,
+				recordUri: existingUri,
+			});
 		}
 
 		const result = await agent.com.atproto.repo.createRecord({
@@ -119,7 +130,11 @@ subscribe.post("/", async (c) => {
 			},
 		});
 
-		return c.json({ subscribed: true, existing: false, recordUri: result.data.uri });
+		return c.json({
+			subscribed: true,
+			existing: false,
+			recordUri: result.data.uri,
+		});
 	} catch (error) {
 		console.error("Subscribe POST error:", error);
 		// Treat expired/missing session as unauthenticated
@@ -141,7 +156,10 @@ subscribe.get("/", async (c) => {
 	const styleHref = await getVocsStyleHref(c.env.ASSETS, c.req.url);
 
 	if (!publicationUri || !publicationUri.startsWith("at://")) {
-		return c.html(renderError("Missing or invalid publication URI.", styleHref), 400);
+		return c.html(
+			renderError("Missing or invalid publication URI.", styleHref),
+			400,
+		);
 	}
 
 	const did = getSessionDid(c);
@@ -154,9 +172,15 @@ subscribe.get("/", async (c) => {
 		const session = await client.restore(did);
 		const agent = new Agent(session);
 
-		const existingUri = await findExistingSubscription(agent, did, publicationUri);
+		const existingUri = await findExistingSubscription(
+			agent,
+			did,
+			publicationUri,
+		);
 		if (existingUri) {
-			return c.html(renderSuccess(publicationUri, existingUri, true, styleHref));
+			return c.html(
+				renderSuccess(publicationUri, existingUri, true, styleHref),
+			);
 		}
 
 		const result = await agent.com.atproto.repo.createRecord({
@@ -168,11 +192,19 @@ subscribe.get("/", async (c) => {
 			},
 		});
 
-		return c.html(renderSuccess(publicationUri, result.data.uri, false, styleHref));
+		return c.html(
+			renderSuccess(publicationUri, result.data.uri, false, styleHref),
+		);
 	} catch (error) {
 		console.error("Subscribe GET error:", error);
 		// Session expired - ask the user to sign in again
-		return c.html(renderHandleForm(publicationUri, styleHref, "Session expired. Please sign in again."));
+		return c.html(
+			renderHandleForm(
+				publicationUri,
+				styleHref,
+				"Session expired. Please sign in again.",
+			),
+		);
 	}
 });
 
@@ -190,7 +222,10 @@ subscribe.post("/login", async (c) => {
 
 	if (!handle || !publicationUri) {
 		const styleHref = await getVocsStyleHref(c.env.ASSETS, c.req.url);
-		return c.html(renderError("Missing handle or publication URI.", styleHref), 400);
+		return c.html(
+			renderError("Missing handle or publication URI.", styleHref),
+			400,
+		);
 	}
 
 	const returnTo = `${c.env.CLIENT_URL}/subscribe?publicationUri=${encodeURIComponent(publicationUri)}`;
@@ -205,12 +240,17 @@ subscribe.post("/login", async (c) => {
 // HTML rendering
 // ============================================================================
 
-function renderHandleForm(publicationUri: string, styleHref: string, error?: string): string {
+function renderHandleForm(
+	publicationUri: string,
+	styleHref: string,
+	error?: string,
+): string {
 	const errorHtml = error
 		? `<p class="vocs_Paragraph error">${escapeHtml(error)}</p>`
 		: "";
 
-	return page(`
+	return page(
+		`
 		<h1 class="vocs_H1 vocs_Heading">Subscribe on Bluesky</h1>
 		<p class="vocs_Paragraph">Enter your Bluesky handle to subscribe to this publication.</p>
 		${errorHtml}
@@ -226,7 +266,9 @@ function renderHandleForm(publicationUri: string, styleHref: string, error?: str
 			/>
 			<button type="submit" class="vocs_Button_button vocs_Button_button_accent">Continue on Bluesky</button>
 		</form>
-	`, styleHref);
+	`,
+		styleHref,
+	);
 }
 
 function renderSuccess(
@@ -240,16 +282,22 @@ function renderSuccess(
 		: "You've successfully subscribed!";
 	const escapedPublicationUri = escapeHtml(publicationUri);
 	const escapedRecordUri = escapeHtml(recordUri);
-	return page(`
+	return page(
+		`
 		<h1 class="vocs_H1 vocs_Heading">Subscribed ✓</h1>
 		<p class="vocs_Paragraph">${msg}</p>
 		<p class="vocs_Paragraph"><small>Publication: <code class="vocs_Code"><a href="https://pds.ls/${escapedPublicationUri}">${escapedPublicationUri}</a></code></small></p>
 		<p class="vocs_Paragraph"><small>Record: <code class="vocs_Code"><a href="https://pds.ls/${escapedRecordUri}">${escapedRecordUri}</a></code></small></p>
-	`, styleHref);
+	`,
+		styleHref,
+	);
 }
 
 function renderError(message: string, styleHref: string): string {
-	return page(`<h1 class="vocs_H1 vocs_Heading">Error</h1><p class="vocs_Paragraph error">${escapeHtml(message)}</p>`, styleHref);
+	return page(
+		`<h1 class="vocs_H1 vocs_Heading">Error</h1><p class="vocs_Paragraph error">${escapeHtml(message)}</p>`,
+		styleHref,
+	);
 }
 
 function page(body: string, styleHref: string): string {

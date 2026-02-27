@@ -19,10 +19,7 @@ const errorRedirectRequests = new WeakSet<Request>();
 const OriginalRequest = globalThis.Request;
 
 globalThis.Request = class extends OriginalRequest {
-	constructor(
-		input: RequestInfo | URL,
-		init?: RequestInit,
-	) {
+	constructor(input: RequestInfo | URL, init?: RequestInit) {
 		super(input, sanitizeInit(init));
 		if (init?.redirect === "error") {
 			errorRedirectRequests.add(this);
