@@ -27,7 +27,7 @@ auth.get("/client-metadata.json", (c) => {
 		redirect_uris: [redirectUri],
 		grant_types: ["authorization_code", "refresh_token"],
 		response_types: ["code"],
-		scope: "atproto site.standard.graph.subscription",
+		scope: "atproto repo:site.standard.graph.subscription?action=create",
 		token_endpoint_auth_method: "none",
 		application_type: "web",
 		dpop_bound_access_tokens: true,
@@ -44,7 +44,7 @@ auth.get("/login", async (c) => {
 
 		const client = createOAuthClient(c.env.SEQUOIA_SESSIONS, c.env.CLIENT_URL);
 		const authUrl = await client.authorize(handle, {
-			scope: "atproto site.standard.graph.subscription",
+			scope: "atproto repo:site.standard.graph.subscription?action=create",
 		});
 
 		return c.redirect(authUrl.toString());
