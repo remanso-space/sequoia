@@ -258,14 +258,21 @@ class SequoiaSubscribe extends BaseElement {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				credentials: "include",
+				referrerPolicy: "no-referrer-when-downgrade",
 				body: JSON.stringify({ publicationUri }),
 			});
 
 			const data = await response.json();
 
 			if (response.status === 401 && data.authenticated === false) {
-				// Redirect to the hosted subscribe page to complete OAuth
-				window.location.href = data.subscribeUrl;
+				// Redirect to the hosted subscribe page to complete OAuth,
+				// passing the current page URL (without credentials) as returnTo.
+				const subscribeUrl = new URL(data.subscribeUrl);
+				const pageUrl = new URL(window.location.href);
+				pageUrl.username = "";
+				pageUrl.password = "";
+				subscribeUrl.searchParams.set("returnTo", pageUrl.toString());
+				window.location.href = subscribeUrl.toString();
 				return;
 			}
 
